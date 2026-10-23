@@ -1,0 +1,31 @@
+# Node
+node_modules/
+.next/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Python (verifier)
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+*.secret
+*.key
+
+# Uploads and local data
+uploads/
+*.log
+pgdata/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
