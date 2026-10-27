@@ -1,4 +1,4 @@
-# ⛪ Antioch
+# ⛪ Antioch app
 
 > Fund missions, scholarships and church projects with USDC on Stellar. Every release is verified and visible on-chain.
 
