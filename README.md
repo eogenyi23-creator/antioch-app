@@ -29,6 +29,7 @@ This monorepo holds the full platform:
 | `apps/api` | REST API: auth, campaigns, Stellar transactions, reconciliation | Node, Express, TypeScript |
 | `apps/verifier` | Optional evidence checks that flag doubtful submissions for human approvers | Python, FastAPI |
 | `packages/shared` | Shared types, schemas and amount helpers | TypeScript, Zod |
+| `packages/escrow-client` | XDR builders and read helpers for the escrow contract (copy from antioch-escrow) | TypeScript |
 
 The smart contract lives in its own repo: [antioch-escrow](https://github.com/eogenyi23-creator/antioch-escrow).
 
@@ -65,7 +66,7 @@ sequenceDiagram
 | Layer | Technology |
 |---|---|
 | Web | Next.js, React, Tailwind CSS, Stellar Wallets Kit |
-| API | Node.js, Express, Zod, JWT, MongoDB or Postgres |
+| API | Node.js, Express, Zod, JWT, PostgreSQL |
 | Blockchain | `@stellar/stellar-sdk`, Soroban RPC |
 | Verifier | Python, FastAPI |
 | Tooling | Docker Compose, GitHub Actions, OpenAPI |
@@ -98,11 +99,15 @@ The web app runs at `http://localhost:3000` and the API at `http://localhost:500
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | No (default `http://localhost:5000`) | API base URL |
 | `NEXT_PUBLIC_STELLAR_NETWORK` | No (default `testnet`) | `testnet` or `mainnet` |
-| `DATABASE_URL` | **Yes** | Database connection string |
+| `DATABASE_URL` | **Yes** | PostgreSQL 16 connection string |
 | `JWT_SECRET` | **Yes** | Secret for access and refresh tokens |
 | `SOROBAN_RPC_URL` | **Yes** | Soroban RPC endpoint |
-| `ESCROW_CONTRACT_ID` | **Yes** | Deployed `antioch-escrow` contract |
+| `ESCROW_WASM_HASH` | **Yes** | WASM hash used when deploying new campaign escrow contracts |
+| `DEPLOYER_SECRET` | **Yes** | Low-balance platform key that signs deploy transactions only |
+| `TOKEN_CONTRACT_ID` | **Yes** | Token SAC contract ID (USDC or test token) |
+| `ESCROW_CONTRACT_ID` | No | Showcase / demo contract for read-only dev; real campaigns store their own |
 | `USDC_ISSUER` | **Yes** | USDC issuer for the chosen network |
+| `USDC_ASSET_CODE` | No (default `USDC`) | Token asset code |
 | `FEE_SPONSOR_ENABLED` | No (default `false`) | Enable platform-paid network fees |
 | `FEE_SPONSOR_SECRET` | If sponsoring | Low-balance fee-source account key |
 | `VERIFIER_URL` | No | Verifier service URL |

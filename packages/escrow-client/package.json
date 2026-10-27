@@ -1,0 +1,19 @@
+{
+  "name": "@antioch/escrow-client",
+  "version": "0.1.0",
+  "description": "XDR builders and read helpers for the antioch-escrow Soroban contract",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "peerDependencies": {
+    "@stellar/stellar-sdk": ">=12.0.0"
+  },
+  "devDependencies": {
+    "@stellar/stellar-sdk": "^12.0.0",
+    "typescript": "^5.4.0"
+  }
+}
