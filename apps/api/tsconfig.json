@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": true,
+    "paths": {
+      "@antioch/shared": ["../../packages/shared/dist/index.d.ts"],
+      "@antioch/escrow-client": ["../../packages/escrow-client/dist/index.d.ts"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "**/__tests__"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/escrow-client" }
+  ]
+}

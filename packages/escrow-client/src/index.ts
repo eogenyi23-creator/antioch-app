@@ -22,28 +22,28 @@ export type {
   ReadMilestoneParams,
   ReadDonorContributionParams,
   ReadApprovalsParams,
-} from './types.js';
+} from './types';
 
 // XDR builders (return unsigned base64 XDR strings)
-export { buildFund } from './builders.js';
-export { buildApproveMilestone } from './builders.js';
-export { buildReleaseMilestone } from './builders.js';
-export { buildRefund } from './builders.js';
+export { buildFund } from './builders';
+export { buildApproveMilestone } from './builders';
+export { buildReleaseMilestone } from './builders';
+export { buildRefund } from './builders';
 
 // Read helpers (Soroban simulation)
-export { readState } from './readers.js';
-export { readFundedTotal } from './readers.js';
-export { readReleasedTotal } from './readers.js';
-export { readMilestone } from './readers.js';
-export { readMilestoneCount } from './readers.js';
-export { readApprovals } from './readers.js';
-export { readDonorContribution } from './readers.js';
+export { readState } from './readers';
+export { readFundedTotal } from './readers';
+export { readReleasedTotal } from './readers';
+export { readMilestone } from './readers';
+export { readMilestoneCount } from './readers';
+export { readApprovals } from './readers';
+export { readDonorContribution } from './readers';
 
 // Amount utilities
-export { toStroops, fromStroops } from './amounts.js';
+export { toStroops, fromStroops } from './amounts';
 
 // Error decoding
-export { decodeError, parseContractErrorCode } from './errors.js';
+export { decodeError, parseContractErrorCode } from './errors';
 
 // Ledger ↔ date conversion
 export {
@@ -51,4 +51,4 @@ export {
   dateToLedger,
   ledgerToDate,
   ledgerToDateSync,
-} from './ledger.js';
+} from './ledger';

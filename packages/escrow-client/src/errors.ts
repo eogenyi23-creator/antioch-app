@@ -3,7 +3,7 @@
  * Source: https://github.com/eogenyi23-creator/antioch-escrow
  */
 
-import type { ContractError } from './types.js';
+import type { ContractError } from './types';
 
 const ERROR_MAP: Record<number, { name: string; message: string }> = {
   1:  { name: 'NotInitialized',       message: 'Campaign not initialised' },
