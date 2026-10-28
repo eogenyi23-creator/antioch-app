@@ -20,7 +20,7 @@ import type {
   BuildApproveMilestoneParams,
   BuildReleaseMilestoneParams,
   BuildRefundParams,
-} from './types.js';
+} from './types';
 
 /** 3-second timeout for simulation calls */
 const SIMULATION_TIMEOUT_MS = 3000;

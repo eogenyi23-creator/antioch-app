@@ -23,7 +23,7 @@ import type {
   ReadMilestoneParams,
   ReadDonorContributionParams,
   ReadApprovalsParams,
-} from './types.js';
+} from './types';
 
 /** Throwaway keypair used as the source for simulation-only transactions. */
 const SIM_KEYPAIR = Keypair.random();
