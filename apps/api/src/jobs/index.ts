@@ -103,13 +103,20 @@ export interface DecodedContractEvent {
   amount?: bigint;
 }
 
-export function decodeContractEvent(event: any): DecodedContractEvent | null {
+export function decodeContractEvent(event: unknown): DecodedContractEvent | null {
   try {
-    const topic = (event.topic || []).map((t: any) => scValToNative(t));
-    const value = event.value ? scValToNative(event.value) : undefined;
+    const e = event as {
+      topic?: unknown[];
+      value?: unknown;
+      txHash?: unknown;
+      tx_hash?: unknown;
+      ledger?: unknown;
+    };
+    const topic = (e.topic || []).map((t) => scValToNative(t as never));
+    const value = e.value ? scValToNative(e.value as never) : undefined;
     const first = String(topic[0] ?? '').toLowerCase();
-    const txHash = String(event.txHash ?? event.tx_hash ?? '');
-    const ledger = Number(event.ledger ?? 0);
+    const txHash = String(e.txHash ?? e.tx_hash ?? '');
+    const ledger = Number(e.ledger ?? 0);
 
     let kind: DecodedContractEvent['kind'] | null = null;
     if (first.includes('refund')) kind = 'refund';
@@ -128,16 +135,16 @@ export function decodeContractEvent(event: any): DecodedContractEvent | null {
           : typeof value === 'object' && value !== null
             ? (value.amount ?? value.value ?? 0n)
             : 0n;
-      decoded.amount = typeof amt === 'bigint' ? amt : BigInt(amt as any);
+      decoded.amount = typeof amt === 'bigint' ? amt : BigInt(amt as never);
     } else if (kind === 'approve') {
       decoded.approver = String(topic[1] ?? '');
       decoded.milestoneIndex = Number(topic[2] ?? 0);
     } else if (kind === 'release') {
       decoded.milestoneIndex = Number(topic[1] ?? 0);
       if (typeof value === 'object' && value !== null) {
-        const amt = (value as any).amount ?? (value as any).value;
+        const amt = (value as { amount?: unknown; value?: unknown }).amount ?? (value as { amount?: unknown; value?: unknown }).value;
         if (amt !== undefined) {
-          decoded.amount = typeof amt === 'bigint' ? amt : BigInt(amt as any);
+          decoded.amount = typeof amt === 'bigint' ? amt : BigInt(amt as never);
         }
       }
     } else if (kind === 'refund') {
@@ -148,7 +155,7 @@ export function decodeContractEvent(event: any): DecodedContractEvent | null {
           : typeof value === 'object' && value !== null
             ? (value.amount ?? value.value ?? 0n)
             : 0n;
-      decoded.amount = typeof amt === 'bigint' ? amt : BigInt(amt as any);
+      decoded.amount = typeof amt === 'bigint' ? amt : BigInt(amt as never);
     }
 
     return decoded;
@@ -157,19 +164,25 @@ export function decodeContractEvent(event: any): DecodedContractEvent | null {
   }
 }
 
-export async function processCampaignEvents(campaign: any): Promise<void> {
-  if (!campaign?.contractId) return;
+export async function processCampaignEvents(campaign: unknown): Promise<void> {
+  const c = campaign as {
+    id: string;
+    contractId?: string | null;
+    eventCursor?: string | null;
+    lastEventLedger?: number | null;
+  };
+  if (!c?.contractId) return;
 
-  const filters = [{ type: 'contract', contractIds: [campaign.contractId] }];
-  let cursor = campaign.eventCursor || undefined;
-  const startLedger = campaign.lastEventLedger || 0;
+  const filters = [{ type: 'contract', contractIds: [c.contractId] }];
+  let cursor = c.eventCursor || undefined;
+  const startLedger = c.lastEventLedger || 0;
 
   for (let page = 0; page < 10; page++) {
-    const req: any = { filters, limit: 100 };
+    const req: Record<string, unknown> = { filters, limit: 100 };
     if (cursor) req.cursor = cursor;
     else req.startLedger = startLedger > 0 ? startLedger : 1;
 
-    const res = await sorobanServer.getEvents(req);
+    const res = await sorobanServer.getEvents(req as never);
     const events = Array.isArray(res?.events) ? res.events : [];
 
     for (const ev of events) {
@@ -200,7 +213,7 @@ export async function processCampaignEvents(campaign: any): Promise<void> {
             .insert(donations)
             .values({
               idempotencyKey: decoded.txHash,
-              campaignId: campaign.id,
+              campaignId: c.id,
               donorId: donorUser.id,
               amountStroops: decoded.amount ?? 0n,
               txHash: decoded.txHash,
@@ -232,7 +245,7 @@ export async function processCampaignEvents(campaign: any): Promise<void> {
           await db
             .insert(approvals)
             .values({
-              campaignId: campaign.id,
+              campaignId: c.id,
               milestoneIndex: decoded.milestoneIndex,
               approverId: approverUser.id,
               txHash: decoded.txHash,
@@ -246,7 +259,7 @@ export async function processCampaignEvents(campaign: any): Promise<void> {
           .set({ released: true })
           .where(
             and(
-              eq(milestones.campaignId, campaign.id),
+              eq(milestones.campaignId, c.id),
               eq(milestones.index, decoded.milestoneIndex),
             ),
           );
@@ -256,17 +269,17 @@ export async function processCampaignEvents(campaign: any): Promise<void> {
     }
 
     const lastLedger = events.length
-      ? Math.max(...events.map((e: any) => Number(e.ledger ?? 0)))
+      ? Math.max(...events.map((e) => Number((e as { ledger?: unknown }).ledger ?? 0)))
       : startLedger;
 
     cursor = res?.cursor || cursor;
     await db
       .update(campaigns)
       .set({
-        lastEventLedger: lastLedger > 0 ? lastLedger : campaign.lastEventLedger,
-        eventCursor: cursor || campaign.eventCursor,
+        lastEventLedger: lastLedger > 0 ? lastLedger : (c.lastEventLedger ?? 0),
+        eventCursor: cursor || c.eventCursor || undefined,
       })
-      .where(eq(campaigns.id, campaign.id));
+      .where(eq(campaigns.id, c.id));
 
     if (!events.length || !res?.cursor) break;
   }

@@ -14,7 +14,7 @@ async function main() {
   const db = drizzle(pool);
 
   console.log('Running migrations…');
-  await migrate(db, { migrationsFolder: path.resolve(__dirname, 'migrations') });
+  await migrate(db, { migrationsFolder: path.resolve(__dirname, '../../drizzle') });
   console.log('Migrations complete.');
 
   await pool.end();
