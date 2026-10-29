@@ -9,7 +9,7 @@
 import { Router } from 'express';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { donations, milestones } from '../db/schema.js';
+import { donations, milestones, users, campaigns } from '../db/schema.js';
 import { requireAuth, validate, ApiError } from '../middleware/index.js';
 import {
   DonationInitRequestSchema,
@@ -18,7 +18,7 @@ import {
   fromStroops,
 } from '@antioch/shared';
 import { getCampaignOrThrow } from './campaigns.js';
-import { verifyTransaction } from '../stellar/service.js';
+import { verifyContractCall } from '../stellar/service.js';
 import { env } from '../config/env.js';
 import {
   buildFund,
@@ -187,6 +187,7 @@ router.post(
   requireAuth(['donor', 'applicant', 'approver', 'admin']),
   async (req, res, next) => {
     try {
+      const campaign = await getCampaignOrThrow(req.params['id'] as string);
       const { donationId } = req.body as { donationId: string };
       const [donation] = await db
         .select()
@@ -195,6 +196,11 @@ router.post(
         .limit(1);
 
       if (!donation) throw new ApiError(404, 'Donation not found');
+      if (donation.campaignId !== campaign.id) throw new ApiError(404, 'Donation not found');
+      if (req.user!.id !== donation.donorId && req.user!.role !== 'admin') {
+        throw new ApiError(403, 'Forbidden');
+      }
+
       if (!donation.txHash) throw new ApiError(409, 'No transaction hash recorded yet');
 
       await verifyAndConfirm(donation.id, donation.txHash);
@@ -244,7 +250,31 @@ router.get('/', requireAuth(['admin']), async (req, res, next) => {
 
 async function verifyAndConfirm(donationId: string, txHash: string): Promise<void> {
   try {
-    await verifyTransaction(txHash);
+    const [donation] = await db
+      .select()
+      .from(donations)
+      .where(eq(donations.id, donationId))
+      .limit(1);
+    if (!donation) throw new Error('Donation not found');
+
+    const [donor] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, donation.donorId))
+      .limit(1);
+    const [campaign] = await db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.id, donation.campaignId))
+      .limit(1);
+
+    await verifyContractCall(txHash, {
+      contractId: campaign?.contractId ?? undefined,
+      functionName: 'fund',
+      donor: donor?.stellarAddress,
+      amount: donation.amountStroops,
+    });
+
     await db
       .update(donations)
       .set({ status: 'confirmed', confirmedAt: new Date() })

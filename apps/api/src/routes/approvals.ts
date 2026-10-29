@@ -22,7 +22,7 @@ import {
   ReleaseSubmitRequestSchema,
 } from '@antioch/shared';
 import { getCampaignOrThrow } from './campaigns.js';
-import { verifyTransaction, hasTrustline } from '../stellar/service.js';
+import { verifyContractCall, hasTrustline } from '../stellar/service.js';
 import { env } from '../config/env.js';
 import {
   buildApproveMilestone,
@@ -118,7 +118,12 @@ approvalsRouter.post(
       const index = parseInt(req.params['index'] as string, 10);
       const { txHash } = req.body as { idempotencyKey: string; txHash: string };
 
-      await verifyTransaction(txHash);
+      await verifyContractCall(txHash, {
+        contractId: campaign.contractId,
+        functionName: 'approve_milestone',
+        approver: req.user!.stellarAddress,
+        milestoneIndex: index,
+      });
 
       const [row] = await db
         .insert(approvals)
@@ -176,7 +181,11 @@ approvalsRouter.post(
       const index = parseInt(req.params['index'] as string, 10);
       const { txHash } = req.body as { idempotencyKey: string; txHash: string };
 
-      await verifyTransaction(txHash);
+      await verifyContractCall(txHash, {
+        contractId: campaign.contractId,
+        functionName: 'release_milestone',
+        milestoneIndex: index,
+      });
 
       // Update milestone released flag
       await db
@@ -261,7 +270,11 @@ refundsRouter.post(
     try {
       const { txHash } = req.body as { txHash: string };
       const campaign = await getCampaignOrThrow(req.params['id'] as string);
-      await verifyTransaction(txHash);
+      await verifyContractCall(txHash, {
+        contractId: campaign.contractId,
+        functionName: 'refund',
+        donor: req.user!.stellarAddress,
+      });
       await writeAuditLog(req.user!.id, 'refund.submit', 'campaign', campaign.id, { txHash });
       res.json({ ok: true });
     } catch (err) {
