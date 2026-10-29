@@ -7,12 +7,10 @@
 import {
   Contract,
   TransactionBuilder,
-  Networks,
   BASE_FEE,
   Address,
   nativeToScVal,
-  xdr,
-  SorobanRpc,
+  rpc,
   TimeoutInfinite,
 } from '@stellar/stellar-sdk';
 import type {
@@ -22,8 +20,7 @@ import type {
   BuildRefundParams,
 } from './types';
 
-/** 3-second timeout for simulation calls */
-const SIMULATION_TIMEOUT_MS = 3000;
+/** @antioch/escrow-client – builders */
 
 /**
  * Build an unsigned XDR for fund(donor, amount).
@@ -32,7 +29,7 @@ const SIMULATION_TIMEOUT_MS = 3000;
 export async function buildFund(params: BuildFundParams): Promise<string> {
   const { rpcUrl, networkPassphrase, contractId, donor, amount } = params;
 
-  const server = new SorobanRpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith('http://') });
+  const server = new rpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith('http://') });
   const account = await server.getAccount(donor);
 
   const contract = new Contract(contractId);
@@ -62,7 +59,7 @@ export async function buildApproveMilestone(
 ): Promise<string> {
   const { rpcUrl, networkPassphrase, contractId, approver, index } = params;
 
-  const server = new SorobanRpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith('http://') });
+  const server = new rpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith('http://') });
   const account = await server.getAccount(approver);
 
   const contract = new Contract(contractId);
@@ -93,7 +90,7 @@ export async function buildReleaseMilestone(
 ): Promise<string> {
   const { rpcUrl, networkPassphrase, contractId, caller, index } = params;
 
-  const server = new SorobanRpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith('http://') });
+  const server = new rpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith('http://') });
   const account = await server.getAccount(caller);
 
   const contract = new Contract(contractId);
@@ -121,7 +118,7 @@ export async function buildReleaseMilestone(
 export async function buildRefund(params: BuildRefundParams): Promise<string> {
   const { rpcUrl, networkPassphrase, contractId, donor } = params;
 
-  const server = new SorobanRpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith('http://') });
+  const server = new rpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith('http://') });
   const account = await server.getAccount(donor);
 
   const contract = new Contract(contractId);

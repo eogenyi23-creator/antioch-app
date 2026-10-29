@@ -5,10 +5,9 @@
 
 import {
   Contract,
-  SorobanRpc,
+  rpc,
   TransactionBuilder,
   Keypair,
-  Networks,
   BASE_FEE,
   Address,
   nativeToScVal,
@@ -35,7 +34,7 @@ async function simulate(
   method: string,
   args: xdr.ScVal[] = [],
 ): Promise<xdr.ScVal> {
-  const server = new SorobanRpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith('http://') });
+  const server = new rpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith('http://') });
 
   // Use a throwaway account for simulation — no real account needed
   const account = new (await import('@stellar/stellar-sdk')).Account(
@@ -54,11 +53,11 @@ async function simulate(
 
   const result = await server.simulateTransaction(tx);
 
-  if (SorobanRpc.Api.isSimulationError(result)) {
+  if (rpc.Api.isSimulationError(result)) {
     throw new Error(`Simulation error for ${method}: ${result.error}`);
   }
 
-  const successResult = result as SorobanRpc.Api.SimulateTransactionSuccessResponse;
+  const successResult = result as rpc.Api.SimulateTransactionSuccessResponse;
   if (!successResult.result) {
     throw new Error(`No result from simulation of ${method}`);
   }

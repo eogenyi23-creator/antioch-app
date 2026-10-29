@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@antioch/shared": "*",
-    "@stellar/stellar-sdk": "^12.3.0",
+    "@stellar/stellar-sdk": "^17.4.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.31.4",
@@ -29,6 +29,7 @@
     "zod-to-json-schema": "^3.23.1"
   },
   "devDependencies": {
+    "@babel/plugin-transform-modules-commonjs": "^8.0.1",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.12",
@@ -48,9 +49,19 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "testMatch": ["**/__tests__/**/*.test.ts"],
+    "testMatch": [
+      "**/__tests__/**/*.test.ts"
+    ],
     "moduleNameMapper": {
-      "^@antioch/shared$": "<rootDir>/../../packages/shared/src/index.ts"
-    }
+      "^@antioch/shared$": "<rootDir>/../../packages/shared/src/index.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
+    "transform": {
+      "^.+\\.tsx?$": ["ts-jest", {}],
+      "^.+\\.jsx?$": ["babel-jest", {}]
+    },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(uint8array-extras|@exodus/bytes|@noble/hashes|@noble/ed25519)/)"
+    ]
   }
 }

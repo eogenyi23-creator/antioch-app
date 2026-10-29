@@ -10,18 +10,18 @@
 
 import {
   Keypair,
-  SorobanRpc,
+  rpc,
   TransactionBuilder,
   BASE_FEE,
   Operation,
   Address,
   nativeToScVal,
-  xdr,
+  scValToNative,
   TimeoutInfinite,
 } from '@stellar/stellar-sdk';
 import { env } from '../config/env.js';
 
-const server = new SorobanRpc.Server(env.sorobanRpcUrl);
+const server = new rpc.Server(env.sorobanRpcUrl);
 
 // ---------------------------------------------------------------------------
 // Current ledger
@@ -57,33 +57,41 @@ interface DeployParams {
 
 /**
  * Build, sign with DEPLOYER_SECRET, submit and return the new contract ID.
+ *
+ * Uses Operation.createCustomContract (CAP-0072 CREATE_CONTRACT_V2) which
+ * passes constructor arguments atomically in the same operation, so no
+ * separate __constructor call is needed.
+ *
+ * Constructor argument order matches the contract spec:
+ *   approvers (Vec<Address>), threshold (u32), beneficiary (Address),
+ *   token (Address), milestones (Vec<i128>), expiry_ledger (u32)
+ *
+ * The new contract ID is read from the transaction's return value, not by
+ * scanning ledger changes.
  */
 export async function deployCampaignEscrow(params: DeployParams): Promise<string> {
   const deployerKeypair = Keypair.fromSecret(env.deployerSecret);
   const deployerAccount = await server.getAccount(deployerKeypair.publicKey());
 
-  const wasmHashBytes = Buffer.from(env.escrowWasmHash, 'hex');
+  const wasmHash = Buffer.from(env.escrowWasmHash, 'hex');
 
-  // Constructor args: approvers, threshold, beneficiary, token, milestones, expiry_ledger
+  // Constructor args in spec order:
+  //   approvers (Vec<Address>), threshold (u32), beneficiary (Address),
+  //   token (Address), milestones (Vec<i128>), expiry_ledger (u32)
   const constructorArgs = [
-    xdr.ScVal.scvVec(params.approvers.map((a) => Address.fromString(a).toScVal())),
+    nativeToScVal(params.approvers.map((a) => new Address(a))),
     nativeToScVal(params.threshold, { type: 'u32' }),
-    Address.fromString(params.beneficiary).toScVal(),
-    Address.fromString(env.tokenContractId).toScVal(),
-    xdr.ScVal.scvVec(
-      params.milestoneAmounts.map((amt) => nativeToScVal(amt, { type: 'i128' })),
-    ),
+    new Address(params.beneficiary).toScVal(),
+    new Address(env.tokenContractId).toScVal(),
+    nativeToScVal(params.milestoneAmounts.map((amt) => nativeToScVal(amt, { type: 'i128' }))),
     nativeToScVal(params.expiryLedger, { type: 'u32' }),
   ];
 
-  const deployOp = Operation.invokeContractFunction({
-    contract: 'CAARAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPQ4',
-    function: 'deploy',
-    args: [
-      nativeToScVal(wasmHashBytes, { type: 'bytes' }),
-      nativeToScVal(Keypair.random().publicKey(), { type: 'address' }), // salt
-      xdr.ScVal.scvVec(constructorArgs),
-    ],
+  const deployOp = Operation.createCustomContract({
+    address: new Address(deployerKeypair.publicKey()),
+    wasmHash,
+    salt: crypto.getRandomValues(new Uint8Array(32)),
+    constructorArgs,
   });
 
   const tx = new TransactionBuilder(deployerAccount, {
@@ -109,47 +117,43 @@ export async function deployCampaignEscrow(params: DeployParams): Promise<string
     await sleep(2000);
     const txResult = await server.getTransaction(hash);
     if (txResult.status === 'SUCCESS') {
-      // Extract contract ID from result metadata
-      const contractId = extractDeployedContractId(txResult);
+      // The return value of CREATE_CONTRACT_V2 is the new contract's Address
+      const contractId = extractContractIdFromReturn(txResult);
       if (!contractId) throw new Error('Could not extract contract ID from deploy result');
       return contractId;
     }
     if (txResult.status === 'FAILED') {
       throw new Error(`Deploy transaction failed on-chain: ${hash}`);
     }
+    // NOT_FOUND or DUPLICATE — keep polling
     attempts++;
   }
 
   throw new Error(`Deploy transaction not confirmed after 60 seconds: ${hash}`);
 }
 
-function extractDeployedContractId(
-  txResult: SorobanRpc.Api.GetSuccessfulTransactionResponse,
+/**
+ * Extract the new contract ID from the transaction return value.
+ *
+ * CREATE_CONTRACT_V2 returns the deployed contract address as an ScVal
+ * of type scvAddress. The SDK parses this into `txResult.returnValue`.
+ */
+function extractContractIdFromReturn(
+  txResult: rpc.Api.GetSuccessfulTransactionResponse,
 ): string | null {
   try {
-    // In stellar-sdk v12+, resultMetaXdr is already a parsed TransactionMeta object
-    const meta = txResult.resultMetaXdr;
-    let v3;
-    try {
-      v3 = meta.v3();
-    } catch {
-      return null;
+    const retval = txResult.returnValue;
+    if (!retval) return null;
+    // scValToNative converts an scvAddress to its strkey string
+    const native = scValToNative(retval);
+    if (typeof native === 'string' && native.startsWith('C')) {
+      return native;
     }
-    for (const op of v3.operations()) {
-      for (const change of op.changes()) {
-        if (change.switch() === xdr.LedgerEntryChangeType.ledgerEntryCreated()) {
-          const entry = change.created().data();
-          if (entry.switch() === xdr.LedgerEntryType.contractData()) {
-            const contractData = entry.contractData();
-            return Address.fromScAddress(contractData.contract()).toString();
-          }
-        }
-      }
-    }
+    // Fallback: try Address.fromScVal directly
+    return Address.fromScVal(retval).toString();
   } catch {
-    // ignore parse errors
+    return null;
   }
-  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -161,9 +165,10 @@ function extractDeployedContractId(
  */
 export async function hasTrustline(stellarAddress: string): Promise<boolean> {
   try {
-    const horizon = env.stellarNetwork === 'mainnet'
-      ? 'https://horizon.stellar.org'
-      : 'https://horizon-testnet.stellar.org';
+    const horizon =
+      env.stellarNetwork === 'mainnet'
+        ? 'https://horizon.stellar.org'
+        : 'https://horizon-testnet.stellar.org';
 
     const resp = await fetch(
       `${horizon}/accounts/${encodeURIComponent(stellarAddress)}`,
@@ -175,8 +180,7 @@ export async function hasTrustline(stellarAddress: string): Promise<boolean> {
     };
 
     return account.balances.some(
-      (b) =>
-        b.asset_code === env.usdcAssetCode && b.asset_issuer === env.usdcIssuer,
+      (b) => b.asset_code === env.usdcAssetCode && b.asset_issuer === env.usdcIssuer,
     );
   } catch {
     return false;
@@ -194,11 +198,11 @@ export async function hasTrustline(stellarAddress: string): Promise<boolean> {
 export async function verifyTransaction(
   txHash: string,
   maxAttempts = 20,
-): Promise<SorobanRpc.Api.GetSuccessfulTransactionResponse> {
+): Promise<rpc.Api.GetSuccessfulTransactionResponse> {
   for (let i = 0; i < maxAttempts; i++) {
     const result = await server.getTransaction(txHash);
     if (result.status === 'SUCCESS') {
-      return result as SorobanRpc.Api.GetSuccessfulTransactionResponse;
+      return result as rpc.Api.GetSuccessfulTransactionResponse;
     }
     if (result.status === 'FAILED') {
       throw new Error(`Transaction failed on-chain: ${txHash}`);
