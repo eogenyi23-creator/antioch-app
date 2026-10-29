@@ -6,7 +6,7 @@
 
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { campaigns, donations, milestones, users } from '../db/schema.js';
+import { campaigns, donations, milestones, users, approvals } from '../db/schema.js';
 import { verifyContractCall, sorobanServer } from '../stellar/service.js';
 import { env } from '../config/env.js';
 import {
@@ -21,6 +21,7 @@ import {
   Keypair,
   TimeoutInfinite,
   nativeToScVal,
+  scValToNative,
 } from '@stellar/stellar-sdk';
 
 // ---------------------------------------------------------------------------
@@ -81,12 +82,198 @@ export async function runReconciliation(): Promise<void> {
   for (const campaign of activeCampaigns) {
     if (!campaign.contractId) continue;
     try {
+      await processCampaignEvents(campaign);
+    } catch {
+      // Non-fatal per campaign
+    }
+    try {
       await syncMilestoneReleases(campaign.id, campaign.contractId);
     } catch {
       // Non-fatal per campaign
     }
   }
 }
+export interface DecodedContractEvent {
+  kind: 'fund' | 'approve' | 'release' | 'refund';
+  txHash: string;
+  ledger: number;
+  donor?: string;
+  approver?: string;
+  milestoneIndex?: number;
+  amount?: bigint;
+}
+
+export function decodeContractEvent(event: any): DecodedContractEvent | null {
+  try {
+    const topic = (event.topic || []).map((t: any) => scValToNative(t));
+    const value = event.value ? scValToNative(event.value) : undefined;
+    const first = String(topic[0] ?? '').toLowerCase();
+    const txHash = String(event.txHash ?? event.tx_hash ?? '');
+    const ledger = Number(event.ledger ?? 0);
+
+    let kind: DecodedContractEvent['kind'] | null = null;
+    if (first.includes('refund')) kind = 'refund';
+    else if (first.includes('approve')) kind = 'approve';
+    else if (first.includes('release')) kind = 'release';
+    else if (first.includes('fund')) kind = 'fund';
+    if (!kind) return null;
+
+    const decoded: DecodedContractEvent = { kind, txHash, ledger };
+
+    if (kind === 'fund') {
+      decoded.donor = String(topic[1] ?? '');
+      const amt =
+        typeof value === 'bigint'
+          ? value
+          : typeof value === 'object' && value !== null
+            ? (value.amount ?? value.value ?? 0n)
+            : 0n;
+      decoded.amount = typeof amt === 'bigint' ? amt : BigInt(amt as any);
+    } else if (kind === 'approve') {
+      decoded.approver = String(topic[1] ?? '');
+      decoded.milestoneIndex = Number(topic[2] ?? 0);
+    } else if (kind === 'release') {
+      decoded.milestoneIndex = Number(topic[1] ?? 0);
+      if (typeof value === 'object' && value !== null) {
+        const amt = (value as any).amount ?? (value as any).value;
+        if (amt !== undefined) {
+          decoded.amount = typeof amt === 'bigint' ? amt : BigInt(amt as any);
+        }
+      }
+    } else if (kind === 'refund') {
+      decoded.donor = String(topic[1] ?? '');
+      const amt =
+        typeof value === 'bigint'
+          ? value
+          : typeof value === 'object' && value !== null
+            ? (value.amount ?? value.value ?? 0n)
+            : 0n;
+      decoded.amount = typeof amt === 'bigint' ? amt : BigInt(amt as any);
+    }
+
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+export async function processCampaignEvents(campaign: any): Promise<void> {
+  if (!campaign?.contractId) return;
+
+  const filters = [{ type: 'contract', contractIds: [campaign.contractId] }];
+  let cursor = campaign.eventCursor || undefined;
+  const startLedger = campaign.lastEventLedger || 0;
+
+  for (let page = 0; page < 10; page++) {
+    const req: any = { filters, limit: 100 };
+    if (cursor) req.cursor = cursor;
+    else req.startLedger = startLedger > 0 ? startLedger : 1;
+
+    const res = await sorobanServer.getEvents(req);
+    const events = Array.isArray(res?.events) ? res.events : [];
+
+    for (const ev of events) {
+      const decoded = decodeContractEvent(ev);
+      if (!decoded) continue;
+
+      if (decoded.kind === 'fund') {
+        if (!decoded.donor) continue;
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.stellarAddress, decoded.donor))
+          .limit(1);
+        const donorUser =
+          user ||
+          (await db
+            .insert(users)
+            .values({ stellarAddress: decoded.donor, role: 'donor' })
+            .returning())[0];
+
+        const existing = await db
+          .select()
+          .from(donations)
+          .where(eq(donations.txHash, decoded.txHash))
+          .limit(1);
+        if (existing.length === 0) {
+          await db
+            .insert(donations)
+            .values({
+              idempotencyKey: decoded.txHash,
+              campaignId: campaign.id,
+              donorId: donorUser.id,
+              amountStroops: decoded.amount ?? 0n,
+              txHash: decoded.txHash,
+              status: 'confirmed',
+              confirmedAt: new Date(),
+            })
+            .catch(() => {});
+        }
+      } else if (decoded.kind === 'approve') {
+        if (!decoded.approver || decoded.milestoneIndex === undefined) continue;
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.stellarAddress, decoded.approver))
+          .limit(1);
+        const approverUser =
+          user ||
+          (await db
+            .insert(users)
+            .values({ stellarAddress: decoded.approver, role: 'approver' })
+            .returning())[0];
+
+        const existing = await db
+          .select()
+          .from(approvals)
+          .where(eq(approvals.txHash, decoded.txHash))
+          .limit(1);
+        if (existing.length === 0) {
+          await db
+            .insert(approvals)
+            .values({
+              campaignId: campaign.id,
+              milestoneIndex: decoded.milestoneIndex,
+              approverId: approverUser.id,
+              txHash: decoded.txHash,
+            })
+            .catch(() => {});
+        }
+      } else if (decoded.kind === 'release') {
+        if (decoded.milestoneIndex === undefined) continue;
+        await db
+          .update(milestones)
+          .set({ released: true })
+          .where(
+            and(
+              eq(milestones.campaignId, campaign.id),
+              eq(milestones.index, decoded.milestoneIndex),
+            ),
+          );
+      } else if (decoded.kind === 'refund') {
+        // No dedicated table; cursor update is enough.
+      }
+    }
+
+    const lastLedger = events.length
+      ? Math.max(...events.map((e: any) => Number(e.ledger ?? 0)))
+      : startLedger;
+
+    cursor = res?.cursor || cursor;
+    await db
+      .update(campaigns)
+      .set({
+        lastEventLedger: lastLedger > 0 ? lastLedger : campaign.lastEventLedger,
+        eventCursor: cursor || campaign.eventCursor,
+      })
+      .where(eq(campaigns.id, campaign.id));
+
+    if (!events.length || !res?.cursor) break;
+  }
+}
+
+
+
 
 async function syncMilestoneReleases(
   campaignId: string,
