@@ -72,6 +72,8 @@ export const campaigns = pgTable('campaigns', {
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   publishedAt: timestamp('published_at', { withTimezone: true }),
+  lastEventLedger: integer('last_event_ledger').notNull().default(0),
+  eventCursor: text('event_cursor'),
 });
 
 // ---------------------------------------------------------------------------
