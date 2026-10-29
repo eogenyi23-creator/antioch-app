@@ -184,7 +184,7 @@ export const feeSponsorSpend = pgTable('fee_sponsor_spend', {
     .notNull()
     .references(() => users.id),
   date: date('date').notNull(),
-  amountStroops: bigint('amount_stroops', { mode: 'bigint' }).notNull().default(0n),
+  amountStroops: bigint('amount_stroops', { mode: 'bigint' }).notNull(),
   txCount: integer('tx_count').notNull().default(0),
 });
 

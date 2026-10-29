@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
+    "dev": "npm run dev --workspace=apps/api",
     "build": "npm run build --workspace=packages/escrow-client && npm run build --workspace=packages/shared && npm run build --workspace=apps/api",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
