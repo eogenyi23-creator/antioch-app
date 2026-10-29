@@ -79,7 +79,7 @@ router.post('/verify', validate(AuthVerifyRequestSchema), async (req, res, next)
     const keypair = Keypair.fromPublicKey(stellarAddress);
     const hash = tx.hash();
     const sig = tx.signatures[0];
-    if (!sig || !keypair.verify(hash, sig.signature())) {
+    if (!sig || !keypair.verify(hash, sig.signature.toBytes())) {
       throw new ApiError(401, 'Invalid signature');
     }
 

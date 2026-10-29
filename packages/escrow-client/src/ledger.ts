@@ -8,7 +8,7 @@
  * Source: https://github.com/eogenyi23-creator/antioch-escrow
  */
 
-import { SorobanRpc } from '@stellar/stellar-sdk';
+import { rpc } from '@stellar/stellar-sdk';
 
 const SECONDS_PER_LEDGER = 5;
 
@@ -16,7 +16,7 @@ const SECONDS_PER_LEDGER = 5;
  * Fetch the current ledger sequence number from Soroban RPC.
  */
 export async function getLatestLedger(rpcUrl: string): Promise<number> {
-  const server = new SorobanRpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith('http://') });
+  const server = new rpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith('http://') });
   const ledger = await server.getLatestLedger();
   return ledger.sequence;
 }
