@@ -221,4 +221,249 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// ---------------------------------------------------------------------------
+// Verify a contract call transaction
+// ---------------------------------------------------------------------------
+
+export interface VerifyContractCallExpected {
+  contractId?: unknown;
+  contract?: unknown;
+  contract_id?: unknown;
+  expectedContractId?: unknown;
+  contractAddress?: unknown;
+  functionName?: unknown;
+  function?: unknown;
+  method?: unknown;
+  fn?: unknown;
+  expectedFunction?: unknown;
+  expectedFunctionName?: unknown;
+  name?: unknown;
+  args?: unknown;
+  arguments?: unknown;
+  params?: unknown;
+  parameters?: unknown;
+  donor?: unknown;
+  approver?: unknown;
+  address?: unknown;
+  caller?: unknown;
+  from?: unknown;
+  account?: unknown;
+  amount?: unknown;
+  amountStroops?: unknown;
+  value?: unknown;
+  milestoneIndex?: unknown;
+  milestone_index?: unknown;
+  index?: unknown;
+  milestone?: unknown;
+}
+
+function pickFirst(...vals: unknown[]): unknown {
+  for (const v of vals) {
+    if (v !== undefined && v !== null) return v;
+  }
+  return undefined;
+}
+
+function toBigIntValue(v: unknown): bigint | null {
+  if (typeof v === 'bigint') return v;
+  if (typeof v === 'number' && Number.isFinite(v)) return BigInt(Math.trunc(v));
+  if (typeof v === 'string') {
+    try {
+      return BigInt(v);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function argsEqual(expected: unknown, actual: unknown): boolean {
+  if (typeof actual === 'bigint') {
+    const e = toBigIntValue(expected);
+    return e !== null && e === actual;
+  }
+  if (typeof actual === 'number') {
+    const e =
+      typeof expected === 'number'
+        ? expected
+        : typeof expected === 'string'
+          ? Number(expected)
+          : typeof expected === 'bigint'
+            ? Number(expected)
+            : NaN;
+    return Number.isFinite(e) && e === actual;
+  }
+  if (typeof actual === 'string') {
+    return String(expected) === actual;
+  }
+  if (typeof actual === 'boolean' || actual === null || actual === undefined) {
+    return expected === actual;
+  }
+  try {
+    return JSON.stringify(expected) === JSON.stringify(actual);
+  } catch {
+    return false;
+  }
+}
+
+export async function verifyContractCall(
+  txHash: string,
+  expectedInput: VerifyContractCallExpected | string = {},
+  maxAttempts = 20,
+): Promise<rpc.Api.GetSuccessfulTransactionResponse> {
+  const normalizedExpected: VerifyContractCallExpected =
+    typeof expectedInput === 'string' ? { functionName: expectedInput } : expectedInput || {};
+  const expected = normalizedExpected;
+
+  const txResult = await verifyTransaction(txHash, maxAttempts);
+  let transaction: unknown = TransactionBuilder.fromXDR(
+    txResult.envelopeXdr,
+    env.networkPassphrase,
+  );
+  if (transaction && (transaction as { innerTransaction?: unknown }).innerTransaction) {
+    transaction = (transaction as { innerTransaction: unknown }).innerTransaction;
+  }
+  const ops: unknown[] = Array.isArray((transaction as { operations?: unknown })?.operations)
+    ? ((transaction as { operations: unknown[] }).operations)
+    : [];
+  if (ops.length !== 1) {
+    throw new Error(
+      `Transaction must contain exactly one operation (found ${ops.length})`,
+    );
+  }
+  const op = ops[0] as {
+    type?: string;
+    func?: {
+      type?: string;
+      invokeContract?: {
+        contractAddress: unknown;
+        functionName: unknown;
+        args?: unknown[];
+      };
+    };
+  };
+  if (!op || op.type !== 'invokeHostFunction') {
+    throw new Error('Transaction operation is not a contract call');
+  }
+  const hostFn = op.func;
+  if (!hostFn || hostFn.type !== 'hostFunctionTypeInvokeContract') {
+    throw new Error('Transaction operation is not an invoke_contract call');
+  }
+  const invokeArgs = hostFn.invokeContract as {
+    contractAddress: unknown;
+    functionName: unknown;
+    args?: unknown[];
+  };
+  const contractId = Address.fromScAddress(invokeArgs.contractAddress as never).toString();
+  const functionName = String(invokeArgs.functionName);
+  const args: unknown[] = (invokeArgs.args || []).map((a: unknown) =>
+    scValToNative(a as never),
+  );
+
+  const expContract = pickFirst(
+    expected.contractId,
+    expected.contract,
+    expected.contract_id,
+    expected.expectedContractId,
+    expected.contractAddress,
+  );
+  if (expContract !== undefined && String(expContract) !== contractId) {
+    throw new Error(
+      `Contract mismatch: expected ${expContract}, got ${contractId}`,
+    );
+  }
+
+  const expFn = pickFirst(
+    expected.functionName,
+    expected.function,
+    expected.method,
+    expected.fn,
+    expected.expectedFunction,
+    expected.expectedFunctionName,
+    expected.name,
+  );
+  if (expFn !== undefined && String(expFn) !== functionName) {
+    throw new Error(
+      `Function mismatch: expected ${expFn}, got ${functionName}`,
+    );
+  }
+
+  const expArgs = pickFirst(
+    expected.args,
+    expected.arguments,
+    expected.params,
+    expected.parameters,
+  );
+  if (Array.isArray(expArgs)) {
+    if (expArgs.length !== args.length) {
+      throw new Error(
+        `Argument count mismatch: expected ${expArgs.length}, got ${args.length}`,
+      );
+    }
+    for (let i = 0; i < args.length; i++) {
+      if (!argsEqual(expArgs[i], args[i])) {
+        throw new Error(`Argument mismatch at index ${i}`);
+      }
+    }
+  }
+
+  const expAddress = pickFirst(
+    expected.donor,
+    expected.approver,
+    expected.address,
+    expected.caller,
+    expected.from,
+    expected.account,
+  );
+  if (expAddress !== undefined) {
+    const candidate =
+      typeof args[0] === 'string' ? args[0] : args.find((a) => typeof a === 'string');
+    if (candidate !== undefined && !argsEqual(expAddress, candidate)) {
+      throw new Error(
+        `Donor/approver mismatch: expected ${expAddress}, got ${candidate}`,
+      );
+    }
+  }
+
+  const expAmount = pickFirst(
+    expected.amount,
+    expected.amountStroops,
+    expected.value,
+  );
+  if (expAmount !== undefined) {
+    const candidate = args.find((a) => typeof a === 'bigint');
+    if (candidate === undefined || !argsEqual(expAmount, candidate)) {
+      throw new Error(
+        `Amount mismatch: expected ${expAmount}, got ${candidate}`,
+      );
+    }
+  }
+
+  const expIndex = pickFirst(
+    expected.milestoneIndex,
+    expected.milestone_index,
+    expected.index,
+    expected.milestone,
+  );
+  if (expIndex !== undefined) {
+    const candidate = args.find((a) => typeof a === 'number');
+    const target =
+      candidate !== undefined
+        ? candidate
+        : args.find(
+            (a) =>
+              typeof a === 'bigint' &&
+              a >= 0n &&
+              a < 1000000n,
+          );
+    if (target === undefined || !argsEqual(expIndex, target)) {
+      throw new Error(
+        `Milestone index mismatch: expected ${expIndex}, got ${target}`,
+      );
+    }
+  }
+
+  return txResult;
+}
+
 export { server as sorobanServer };

@@ -6,8 +6,8 @@
 
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { campaigns, donations, milestones } from '../db/schema.js';
-import { verifyTransaction, sorobanServer } from '../stellar/service.js';
+import { campaigns, donations, milestones, users } from '../db/schema.js';
+import { verifyContractCall, sorobanServer } from '../stellar/service.js';
 import { env } from '../config/env.js';
 import {
   readMilestone,
@@ -36,7 +36,26 @@ export async function runReconciliation(): Promise<void> {
   for (const donation of pending) {
     if (!donation.txHash) continue;
     try {
-      await verifyTransaction(donation.txHash, 3); // quick check only
+      const [donor] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, donation.donorId))
+        .limit(1);
+      const [campaign] = await db
+        .select()
+        .from(campaigns)
+        .where(eq(campaigns.id, donation.campaignId))
+        .limit(1);
+      await verifyContractCall(
+        donation.txHash,
+        {
+          contractId: campaign?.contractId ?? undefined,
+          functionName: 'fund',
+          donor: donor?.stellarAddress,
+          amount: donation.amountStroops,
+        },
+        3,
+      );
       await db
         .update(donations)
         .set({ status: 'confirmed', confirmedAt: new Date() })

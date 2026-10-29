@@ -104,7 +104,7 @@ export const donations = pgTable('donations', {
     .notNull()
     .references(() => users.id),
   amountStroops: bigint('amount_stroops', { mode: 'bigint' }).notNull(),
-  txHash: text('tx_hash'),
+  txHash: text('tx_hash').unique(),
   status: donationStatusEnum('status').notNull().default('pending'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
@@ -125,7 +125,7 @@ export const approvals = pgTable(
     approverId: uuid('approver_id')
       .notNull()
       .references(() => users.id),
-    txHash: text('tx_hash'),
+    txHash: text('tx_hash').unique(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
