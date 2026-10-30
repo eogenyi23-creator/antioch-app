@@ -68,6 +68,7 @@ export const campaigns = pgTable('campaigns', {
   beneficiary: text('beneficiary').notNull(),
   contractId: text('contract_id'),
   expiryLedger: integer('expiry_ledger'),
+  deployLedger: integer('deploy_ledger'),
   status: campaignStatusEnum('status').notNull().default('draft'),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
