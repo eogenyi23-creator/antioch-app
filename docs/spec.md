@@ -1,54 +1,9 @@
 # Antioch App — Full Specification
 
-> Living document. This prompt wins over existing files for product scope. The Contract facts section wins for the contract interface. Last updated: 2026-10-27.
+> Living document. The Contract facts section wins for the contract interface. Last updated: 2026-10-27.
 
 ---
 
-## Repo audit
-
-### Files present
-
-| File | Notes |
-|---|---|
-| `README.md` | Good overview, architecture table, setup instructions, env-var table. Missing `ESCROW_WASM_HASH`, `DEPLOYER_SECRET`, `TOKEN_CONTRACT_ID` from the env table — add them. |
-| `LICENSE` | MIT, © 2026 eogenyi23-creator. OK. |
-| `CHANGELOG.md` | Skeleton with Unreleased section. OK. |
-| `CONTRIBUTING.md` | Full workflow, checks and standards. OK. |
-| `SECURITY.md` | Reporting instructions, scope, brief design notes. OK. |
-| `.env.example` | Covers most vars. Missing `ESCROW_WASM_HASH`, `DEPLOYER_SECRET`, `TOKEN_CONTRACT_ID`. Add them (see §Environment variables). |
-| `.gitignore` | Covers Node, Python, secrets, uploads. OK. |
-| `docker-compose.yml` | `postgres:16`, user/pass/db all `antioch`, port `5432`. Matches `DATABASE_URL` in `.env.example`. OK. |
-
-### Files missing — must create
-
-| File | Action |
-|---|---|
-| `docs/architecture.md` | Create (this spec covers the detail; architecture.md is the concise version) |
-| `docs/flows.md` | Create (sequence diagrams for donate, approve, refund) |
-| `docs/deployment.md` | Create (Vercel, Render, testnet/mainnet config) |
-| `.github/PULL_REQUEST_TEMPLATE.md` | Create |
-| `.github/ISSUE_TEMPLATE/bug_report.md` | Create |
-| `.github/ISSUE_TEMPLATE/feature_request.md` | Create |
-
-### Files intentionally absent
-
-| File | Reason |
-|---|---|
-| `.github/workflows/ci.yml` | Will be added after everything passes locally. Do not create. |
-
-### Files expected to be missing (to build)
-
-`apps/web`, `apps/api`, `apps/verifier`, `packages/shared`, `packages/escrow-client`
-
-### Conflicts and resolutions
-
-| Location | Conflict | Resolution |
-|---|---|---|
-| `.env.example` | Missing `ESCROW_WASM_HASH`, `DEPLOYER_SECRET`, `TOKEN_CONTRACT_ID` | Add to `.env.example` (this prompt wins) |
-| `README.md` env table | Same three vars missing | Add rows to the table |
-| `README.md` | No mention of `packages/escrow-client` | Add to architecture table when creating it |
-
----
 
 ## Product overview
 

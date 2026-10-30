@@ -47,12 +47,14 @@ export async function runReconciliation(): Promise<void> {
         .from(campaigns)
         .where(eq(campaigns.id, donation.campaignId))
         .limit(1);
+      if (!campaign?.contractId) throw new Error('Campaign has no contract ID');
+      if (!donor?.stellarAddress) throw new Error('Donor has no address');
       await verifyContractCall(
         donation.txHash,
         {
-          contractId: campaign?.contractId ?? undefined,
+          contractId: campaign.contractId,
           functionName: 'fund',
-          donor: donor?.stellarAddress,
+          donor: donor.stellarAddress,
           amount: donation.amountStroops,
         },
         3,
@@ -61,10 +63,10 @@ export async function runReconciliation(): Promise<void> {
         .update(donations)
         .set({ status: 'confirmed', confirmedAt: new Date() })
         .where(eq(donations.id, donation.id));
-    } catch {
-      // Mark failed if txHash is old (> 5 minutes without confirmation)
-      const age = Date.now() - (donation.createdAt?.getTime() ?? 0);
-      if (age > 5 * 60 * 1000) {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const permanent = /on-chain|Mismatch|mismatch|Argument|must contain|Unknown function/i.test(msg);
+      if (permanent) {
         await db
           .update(donations)
           .set({ status: 'failed' })
@@ -83,13 +85,13 @@ export async function runReconciliation(): Promise<void> {
     if (!campaign.contractId) continue;
     try {
       await processCampaignEvents(campaign);
-    } catch {
-      // Non-fatal per campaign
+    } catch (err) {
+      console.error('[reconciliation] processCampaignEvents failed', campaign.id, err);
     }
     try {
       await syncMilestoneReleases(campaign.id, campaign.contractId);
-    } catch {
-      // Non-fatal per campaign
+    } catch (err) {
+      console.error('[reconciliation] syncMilestoneReleases failed', campaign.id, err);
     }
   }
 }
@@ -170,12 +172,16 @@ export async function processCampaignEvents(campaign: unknown): Promise<void> {
     contractId?: string | null;
     eventCursor?: string | null;
     lastEventLedger?: number | null;
+    deployLedger?: number | null;
   };
   if (!c?.contractId) return;
 
   const filters = [{ type: 'contract', contractIds: [c.contractId] }];
   let cursor = c.eventCursor || undefined;
-  const startLedger = c.lastEventLedger || 0;
+  const startLedger = Math.max(
+    c.lastEventLedger || 0,
+    c.deployLedger || 0,
+  );
 
   for (let page = 0; page < 10; page++) {
     const req: Record<string, unknown> = { filters, limit: 100 };

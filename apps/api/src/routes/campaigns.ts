@@ -223,17 +223,23 @@ router.post('/:id/publish', requireAuth(['admin']), async (req, res, next) => {
       throw new ApiError(422, 'Campaign has no expiry date');
     }
 
-    const contractId = await deployCampaignEscrow({
-      approvers: campaign.approvers,
-      threshold: campaign.threshold,
-      beneficiary: campaign.beneficiary,
-      milestoneAmounts: ms.map((m) => m.amountStroops),
-      expiryLedger: campaign.expiryLedger,
-    });
+    let deployLedger: number | undefined;
+    const contractId = await deployCampaignEscrow(
+      {
+        approvers: campaign.approvers,
+        threshold: campaign.threshold,
+        beneficiary: campaign.beneficiary,
+        milestoneAmounts: ms.map((m) => m.amountStroops),
+        expiryLedger: campaign.expiryLedger,
+      },
+      (l) => {
+        deployLedger = l;
+      },
+    );
 
     const [updated] = await db
       .update(campaigns)
-      .set({ contractId, status: 'active', publishedAt: new Date() })
+      .set({ contractId, status: 'active', publishedAt: new Date(), deployLedger: deployLedger ?? null })
       .where(eq(campaigns.id, campaign.id))
       .returning();
 

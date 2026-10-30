@@ -69,7 +69,10 @@ interface DeployParams {
  * The new contract ID is read from the transaction's return value, not by
  * scanning ledger changes.
  */
-export async function deployCampaignEscrow(params: DeployParams): Promise<string> {
+export async function deployCampaignEscrow(
+  params: DeployParams,
+  onLedger?: (ledger: number) => void,
+): Promise<string> {
   const deployerKeypair = Keypair.fromSecret(env.deployerSecret);
   const deployerAccount = await server.getAccount(deployerKeypair.publicKey());
 
@@ -120,6 +123,7 @@ export async function deployCampaignEscrow(params: DeployParams): Promise<string
       // The return value of CREATE_CONTRACT_V2 is the new contract's Address
       const contractId = extractContractIdFromReturn(txResult);
       if (!contractId) throw new Error('Could not extract contract ID from deploy result');
+      if (typeof txResult.ledger === 'number' && onLedger) onLedger(txResult.ledger);
       return contractId;
     }
     if (txResult.status === 'FAILED') {
@@ -226,42 +230,14 @@ function sleep(ms: number): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export interface VerifyContractCallExpected {
-  contractId?: unknown;
-  contract?: unknown;
-  contract_id?: unknown;
-  expectedContractId?: unknown;
-  contractAddress?: unknown;
-  functionName?: unknown;
-  function?: unknown;
-  method?: unknown;
-  fn?: unknown;
-  expectedFunction?: unknown;
-  expectedFunctionName?: unknown;
-  name?: unknown;
-  args?: unknown;
-  arguments?: unknown;
-  params?: unknown;
-  parameters?: unknown;
-  donor?: unknown;
-  approver?: unknown;
-  address?: unknown;
-  caller?: unknown;
-  from?: unknown;
-  account?: unknown;
+  contractId: string;
+  functionName: string;
+  args?: unknown[];
+  donor?: string;
+  approver?: string;
   amount?: unknown;
-  amountStroops?: unknown;
-  value?: unknown;
   milestoneIndex?: unknown;
-  milestone_index?: unknown;
   index?: unknown;
-  milestone?: unknown;
-}
-
-function pickFirst(...vals: unknown[]): unknown {
-  for (const v of vals) {
-    if (v !== undefined && v !== null) return v;
-  }
-  return undefined;
 }
 
 function toBigIntValue(v: unknown): bigint | null {
@@ -308,12 +284,40 @@ function argsEqual(expected: unknown, actual: unknown): boolean {
 
 export async function verifyContractCall(
   txHash: string,
-  expectedInput: VerifyContractCallExpected | string = {},
+  expectedInput: VerifyContractCallExpected | string = {} as VerifyContractCallExpected,
   maxAttempts = 20,
 ): Promise<rpc.Api.GetSuccessfulTransactionResponse> {
-  const normalizedExpected: VerifyContractCallExpected =
-    typeof expectedInput === 'string' ? { functionName: expectedInput } : expectedInput || {};
-  const expected = normalizedExpected;
+  const expected: VerifyContractCallExpected =
+    typeof expectedInput === 'string'
+      ? ({ contractId: '' as string, functionName: expectedInput })
+      : (expectedInput || ({} as VerifyContractCallExpected));
+
+  if (!expected.contractId) {
+    throw new Error('Missing contractId');
+  }
+  if (!expected.functionName) {
+    throw new Error('Missing functionName');
+  }
+
+  const expectedFnEarly = String(expected.functionName);
+  const milestoneIdxEarly = expected.milestoneIndex ?? expected.index;
+  if (expectedFnEarly === 'fund') {
+    if (expected.donor === undefined || expected.amount === undefined) {
+      throw new Error('Missing expected value');
+    }
+  } else if (expectedFnEarly === 'approve_milestone') {
+    if (expected.approver === undefined || milestoneIdxEarly === undefined) {
+      throw new Error('Missing expected value');
+    }
+  } else if (expectedFnEarly === 'release_milestone') {
+    if (milestoneIdxEarly === undefined) {
+      throw new Error('Missing expected value');
+    }
+  } else if (expectedFnEarly === 'refund') {
+    if (expected.donor === undefined) {
+      throw new Error('Missing expected value');
+    }
+  }
 
   const txResult = await verifyTransaction(txHash, maxAttempts);
   let transaction: unknown = TransactionBuilder.fromXDR(
@@ -331,139 +335,122 @@ export async function verifyContractCall(
       `Transaction must contain exactly one operation (found ${ops.length})`,
     );
   }
-  const op = ops[0] as {
-    type?: string;
-    func?: {
-      type?: string;
-      invokeContract?: {
-        contractAddress: unknown;
-        functionName: unknown;
-        args?: unknown[];
-      };
-    };
-  };
-  if (!op || op.type !== 'invokeHostFunction') {
-    throw new Error('Transaction operation is not a contract call');
+  const op = ops[0] as { type?: unknown; func?: unknown };
+  const opType = typeof op?.type === 'function' ? (op.type as () => unknown)() : op?.type;
+  if (opType !== 'invokeHostFunction') {
+    throw new Error('Transaction operation is not an invoke_host_function call');
   }
-  const hostFn = op.func;
-  if (!hostFn || hostFn.type !== 'hostFunctionTypeInvokeContract') {
+  const hostFn =
+    typeof op?.func === 'function' ? (op.func as () => unknown)() : op?.func;
+  const hostType =
+    typeof (hostFn as { switch?: unknown })?.switch === 'function'
+      ? String((hostFn as { switch: () => unknown }).switch())
+      : (hostFn as { type?: unknown })?.type;
+  if (hostType !== 'hostFunctionTypeInvokeContract') {
     throw new Error('Transaction operation is not an invoke_contract call');
   }
-  const invokeArgs = hostFn.invokeContract as {
-    contractAddress: unknown;
-    functionName: unknown;
-    args?: unknown[];
-  };
-  const contractId = Address.fromScAddress(invokeArgs.contractAddress as never).toString();
-  const functionName = String(invokeArgs.functionName);
-  const args: unknown[] = (invokeArgs.args || []).map((a: unknown) =>
+  const invokeArgs =
+    typeof (hostFn as { invokeContract?: unknown })?.invokeContract === 'function'
+      ? (hostFn as { invokeContract: () => unknown }).invokeContract()
+      : (hostFn as { invokeContract?: unknown })?.invokeContract;
+  const rawContract =
+    typeof (invokeArgs as { contractAddress?: unknown })?.contractAddress === 'function'
+      ? (invokeArgs as { contractAddress: () => unknown }).contractAddress()
+      : (invokeArgs as { contractAddress?: unknown })?.contractAddress;
+  const rawFn =
+    typeof (invokeArgs as { functionName?: unknown })?.functionName === 'function'
+      ? (invokeArgs as { functionName: () => unknown }).functionName()
+      : (invokeArgs as { functionName?: unknown })?.functionName;
+  const rawArgs =
+    typeof (invokeArgs as { args?: unknown })?.args === 'function'
+      ? (invokeArgs as { args: () => unknown }).args()
+      : (invokeArgs as { args?: unknown[] })?.args;
+  const contractId = Address.fromScAddress(rawContract as never).toString();
+  const functionName = String(rawFn);
+  const args: unknown[] = (Array.isArray(rawArgs) ? rawArgs : []).map((a) =>
     scValToNative(a as never),
   );
 
-  const expContract = pickFirst(
-    expected.contractId,
-    expected.contract,
-    expected.contract_id,
-    expected.expectedContractId,
-    expected.contractAddress,
-  );
-  if (expContract !== undefined && String(expContract) !== contractId) {
+  const expectedFn = String(expected.functionName);
+  const milestoneIdx = expected.milestoneIndex ?? expected.index;
+
+  // Validate required expected values before any network call.
+  if (expectedFn === 'fund') {
+    if (expected.donor === undefined || expected.amount === undefined) {
+      throw new Error('Missing expected value');
+    }
+  } else if (expectedFn === 'approve_milestone') {
+    if (expected.approver === undefined || milestoneIdx === undefined) {
+      throw new Error('Missing expected value');
+    }
+  } else if (expectedFn === 'release_milestone') {
+    if (milestoneIdx === undefined) {
+      throw new Error('Missing expected value');
+    }
+  } else if (expectedFn === 'refund') {
+    if (expected.donor === undefined) {
+      throw new Error('Missing expected value');
+    }
+  }
+
+  if (String(expected.contractId) !== contractId) {
     throw new Error(
-      `Contract mismatch: expected ${expContract}, got ${contractId}`,
+      `Contract mismatch: expected ${expected.contractId}, got ${contractId}`,
+    );
+  }
+  if (expectedFn !== functionName) {
+    throw new Error(
+      `Function mismatch: expected ${expectedFn}, got ${functionName}`,
     );
   }
 
-  const expFn = pickFirst(
-    expected.functionName,
-    expected.function,
-    expected.method,
-    expected.fn,
-    expected.expectedFunction,
-    expected.expectedFunctionName,
-    expected.name,
-  );
-  if (expFn !== undefined && String(expFn) !== functionName) {
+  let expectedArgs: unknown[];
+  if (Array.isArray(expected.args)) {
+    expectedArgs = expected.args;
+  } else {
+    switch (expectedFn) {
+      case 'fund':
+        if (expected.donor === undefined || expected.amount === undefined) {
+          throw new Error('Missing expected value');
+        }
+        expectedArgs = [expected.donor, expected.amount];
+        break;
+      case 'approve_milestone':
+        if (expected.approver === undefined || milestoneIdx === undefined) {
+          throw new Error('Missing expected value');
+        }
+        expectedArgs = [expected.approver, milestoneIdx];
+        break;
+      case 'release_milestone':
+        if (milestoneIdx === undefined) {
+          throw new Error('Missing expected value');
+        }
+        expectedArgs = [milestoneIdx];
+        break;
+      case 'refund':
+        if (expected.donor === undefined) {
+          throw new Error('Missing expected value');
+        }
+        expectedArgs = [expected.donor];
+        break;
+      default:
+        throw new Error(`Unknown function: ${expectedFn}`);
+    }
+  }
+
+  if (expectedArgs.length !== args.length) {
     throw new Error(
-      `Function mismatch: expected ${expFn}, got ${functionName}`,
+      `Argument count mismatch: expected ${expectedArgs.length}, got ${args.length}`,
     );
   }
-
-  const expArgs = pickFirst(
-    expected.args,
-    expected.arguments,
-    expected.params,
-    expected.parameters,
-  );
-  if (Array.isArray(expArgs)) {
-    if (expArgs.length !== args.length) {
-      throw new Error(
-        `Argument count mismatch: expected ${expArgs.length}, got ${args.length}`,
-      );
-    }
-    for (let i = 0; i < args.length; i++) {
-      if (!argsEqual(expArgs[i], args[i])) {
-        throw new Error(`Argument mismatch at index ${i}`);
-      }
-    }
-  }
-
-  const expAddress = pickFirst(
-    expected.donor,
-    expected.approver,
-    expected.address,
-    expected.caller,
-    expected.from,
-    expected.account,
-  );
-  if (expAddress !== undefined) {
-    const candidate =
-      typeof args[0] === 'string' ? args[0] : args.find((a) => typeof a === 'string');
-    if (candidate !== undefined && !argsEqual(expAddress, candidate)) {
-      throw new Error(
-        `Donor/approver mismatch: expected ${expAddress}, got ${candidate}`,
-      );
-    }
-  }
-
-  const expAmount = pickFirst(
-    expected.amount,
-    expected.amountStroops,
-    expected.value,
-  );
-  if (expAmount !== undefined) {
-    const candidate = args.find((a) => typeof a === 'bigint');
-    if (candidate === undefined || !argsEqual(expAmount, candidate)) {
-      throw new Error(
-        `Amount mismatch: expected ${expAmount}, got ${candidate}`,
-      );
-    }
-  }
-
-  const expIndex = pickFirst(
-    expected.milestoneIndex,
-    expected.milestone_index,
-    expected.index,
-    expected.milestone,
-  );
-  if (expIndex !== undefined) {
-    const candidate = args.find((a) => typeof a === 'number');
-    const target =
-      candidate !== undefined
-        ? candidate
-        : args.find(
-            (a) =>
-              typeof a === 'bigint' &&
-              a >= 0n &&
-              a < 1000000n,
-          );
-    if (target === undefined || !argsEqual(expIndex, target)) {
-      throw new Error(
-        `Milestone index mismatch: expected ${expIndex}, got ${target}`,
-      );
+  for (let i = 0; i < args.length; i++) {
+    if (!argsEqual(expectedArgs[i], args[i])) {
+      throw new Error(`Argument mismatch at index ${i}`);
     }
   }
 
   return txResult;
 }
+
 
 export { server as sorobanServer };

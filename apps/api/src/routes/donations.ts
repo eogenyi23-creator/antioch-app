@@ -164,13 +164,40 @@ router.post(
         return res.json({ ok: true, status: 'confirmed' });
       }
 
+      const [donor] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, donation.donorId))
+        .limit(1);
+      const [campaign] = await db
+        .select()
+        .from(campaigns)
+        .where(eq(campaigns.id, donation.campaignId))
+        .limit(1);
+
+      if (!campaign?.contractId) throw new ApiError(409, 'Campaign not deployed');
+      if (!donor?.stellarAddress) throw new ApiError(400, 'Donor has no Stellar address');
+
+      const [existingHash] = await db
+        .select()
+        .from(donations)
+        .where(eq(donations.txHash, txHash))
+        .limit(1);
+      if (existingHash && existingHash.id !== donation.id) {
+        throw new ApiError(409, 'Transaction hash already recorded');
+      }
+
+      await verifyContractCall(txHash, {
+        contractId: campaign.contractId,
+        functionName: 'fund',
+        donor: donor.stellarAddress,
+        amount: donation.amountStroops,
+      });
+
       await db
         .update(donations)
-        .set({ txHash, status: 'pending' })
+        .set({ txHash, status: 'confirmed', confirmedAt: new Date() })
         .where(eq(donations.id, donation.id));
-
-      // Kick off async verification (reconciliation job also handles this)
-      verifyAndConfirm(donation.id, txHash).catch(() => { /* handled by reconciliation */ });
 
       res.json({ ok: true, donationId: donation.id, txHash });
     } catch (err) {
@@ -268,10 +295,13 @@ async function verifyAndConfirm(donationId: string, txHash: string): Promise<voi
       .where(eq(campaigns.id, donation.campaignId))
       .limit(1);
 
+    if (!campaign.contractId) throw new Error('Campaign has no contract ID');
+    if (!donor.stellarAddress) throw new Error('Donor has no Stellar address');
+
     await verifyContractCall(txHash, {
-      contractId: campaign?.contractId ?? undefined,
+      contractId: campaign.contractId,
       functionName: 'fund',
-      donor: donor?.stellarAddress,
+      donor: donor.stellarAddress,
       amount: donation.amountStroops,
     });
 
@@ -279,11 +309,15 @@ async function verifyAndConfirm(donationId: string, txHash: string): Promise<voi
       .update(donations)
       .set({ status: 'confirmed', confirmedAt: new Date() })
       .where(eq(donations.id, donationId));
-  } catch {
-    await db
-      .update(donations)
-      .set({ status: 'failed' })
-      .where(eq(donations.id, donationId));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const permanent = /on-chain|Mismatch|mismatch|Argument|must contain|Unknown function/i.test(msg);
+    if (permanent) {
+      await db
+        .update(donations)
+        .set({ status: 'failed' })
+        .where(eq(donations.id, donationId));
+    }
   }
 }
 

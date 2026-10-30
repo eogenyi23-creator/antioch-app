@@ -118,6 +118,15 @@ approvalsRouter.post(
       const index = parseInt(req.params['index'] as string, 10);
       const { txHash } = req.body as { idempotencyKey: string; txHash: string };
 
+      if (!campaign.contractId) throw new ApiError(409, 'Campaign not yet deployed');
+      if (!req.user!.stellarAddress) throw new ApiError(400, 'Approver has no Stellar address');
+      const [existingApproval] = await db
+        .select()
+        .from(approvals)
+        .where(eq(approvals.txHash, txHash))
+        .limit(1);
+      if (existingApproval) throw new ApiError(409, 'Transaction hash already recorded');
+
       await verifyContractCall(txHash, {
         contractId: campaign.contractId,
         functionName: 'approve_milestone',
@@ -180,6 +189,14 @@ approvalsRouter.post(
       const campaign = await getCampaignOrThrow(req.params['id'] as string);
       const index = parseInt(req.params['index'] as string, 10);
       const { txHash } = req.body as { idempotencyKey: string; txHash: string };
+
+      if (!campaign.contractId) throw new ApiError(409, 'Campaign not yet deployed');
+      const [existingRelease] = await db
+        .select()
+        .from(approvals)
+        .where(eq(approvals.txHash, txHash))
+        .limit(1);
+      if (existingRelease) throw new ApiError(409, 'Transaction hash already recorded');
 
       await verifyContractCall(txHash, {
         contractId: campaign.contractId,
@@ -270,6 +287,8 @@ refundsRouter.post(
     try {
       const { txHash } = req.body as { txHash: string };
       const campaign = await getCampaignOrThrow(req.params['id'] as string);
+      if (!campaign.contractId) throw new ApiError(409, 'Campaign not yet deployed');
+      if (!req.user!.stellarAddress) throw new ApiError(400, 'Donor has no Stellar address');
       await verifyContractCall(txHash, {
         contractId: campaign.contractId,
         functionName: 'refund',
