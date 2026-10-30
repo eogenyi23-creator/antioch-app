@@ -556,7 +556,4 @@ uvicorn main:app --reload --port 8000
 
 ## Commit hygiene
 
-- No Co-authored-by trailers.
-- No tool attribution or AI mentions in commits, PRs, comments or files.
-- Commits carry only the repository owner's git identity.
 - Small, focused commits: one idea per commit.
