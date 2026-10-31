@@ -1,0 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --primary: #1d4ed8; }
+.focus-ring:focus { outline: 2px solid #1d4ed8; outline-offset: 2px; }
