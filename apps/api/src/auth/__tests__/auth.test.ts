@@ -20,7 +20,7 @@ let baseUrl: string;
 beforeAll(async () => {
   await new Promise<void>((resolve) => {
     server = app.listen(0, () => {
-      const addr = server.address();
+      const addr = server.address() as import('net').AddressInfo;
       baseUrl = `http://127.0.0.1:${addr.port}`;
       resolve();
     });
