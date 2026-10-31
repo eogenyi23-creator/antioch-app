@@ -15,6 +15,9 @@ export function FundingWidget({
   status,
   kit,
   walletAddress,
+  user,
+  connectWallet,
+  signIn,
   onDonated,
 }: {
   campaignId: string;
@@ -22,6 +25,9 @@ export function FundingWidget({
   status: string;
   kit: StellarWalletsKit | null;
   walletAddress: string | null;
+  user?: { address: string; role: string } | null;
+  connectWallet?: () => void | Promise<void>;
+  signIn?: () => void | Promise<void>;
   onDonated?: () => void;
 }) {
   const [amount, setAmount] = useState('');
@@ -71,7 +77,13 @@ export function FundingWidget({
       {status === 'active' && (
         <div className="mt-4">
           {!walletAddress ? (
-            <button className="rounded bg-blue-600 px-3 py-1 text-white focus-ring" disabled>Connect wallet</button>
+            <button className="rounded bg-blue-600 px-3 py-1 text-white focus-ring" onClick={() => connectWallet?.()}>
+              Connect wallet
+            </button>
+          ) : !user ? (
+            <button className="rounded bg-blue-600 px-3 py-1 text-white focus-ring" onClick={() => signIn?.()}>
+              Sign in to donate
+            </button>
           ) : (
             <>
               <label className="block text-sm font-medium" htmlFor="amount">Amount (USDC)</label>

@@ -1,9 +1,9 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { apiFetch, clearTokens, setTokens, getAccessToken } from '@/lib/api';
+import { apiFetch, clearTokens, setTokens, getAccessToken, getRefreshToken } from '@/lib/api';
 import { WalletNetwork, StellarWalletsKit, FreighterModule, xBullModule, AlbedoModule } from '@creit.tech/stellar-wallets-kit';
-import { RPC_URL, NETWORK_PASSPHRASE, STELLAR_NETWORK } from '@/lib/config';
+import { NETWORK_PASSPHRASE, STELLAR_NETWORK } from '@/lib/config';
 
 interface AuthUser {
   id: string;
@@ -16,6 +16,7 @@ interface AuthContextValue {
   walletAddress: string | null;
   kit: StellarWalletsKit | null;
   connecting: boolean;
+  loading: boolean;
   connectWallet: () => Promise<void>;
   signIn: () => Promise<void>;
   signOut: () => void;
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [kit, setKit] = useState<StellarWalletsKit | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const network = STELLAR_NETWORK === 'mainnet' ? WalletNetwork.PUBLIC : WalletNetwork.TESTNET;
@@ -55,7 +57,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (at) {
       const u = decodeJwt(at);
       if (u) setUser(u);
+      setLoading(false);
+      return;
     }
+    const rt = getRefreshToken();
+    if (!rt) {
+      setLoading(false);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await apiFetch<{ accessToken: string; refreshToken: string }>(
+          '/auth/refresh',
+          { method: 'POST', body: JSON.stringify({ refreshToken: rt }) },
+        );
+        setTokens(res.accessToken, res.refreshToken);
+        const u = decodeJwt(res.accessToken);
+        if (u) setUser(u);
+      } catch {
+        clearTokens();
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   const connectWallet = useCallback(async () => {
@@ -84,11 +108,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       { method: 'POST', body: JSON.stringify({ stellarAddress: address }) },
     );
 
-    // build auth tx
-    const { TransactionBuilder, Memo, Operation, BASE_FEE, rpc } =
+    // build auth tx (account not submitted; use sequence 0)
+    const { TransactionBuilder, Memo, Operation, BASE_FEE, Account } =
       await import('@stellar/stellar-sdk');
-    const server = new rpc.Server(RPC_URL, { allowHttp: RPC_URL.startsWith('http://') });
-    const account = await server.getAccount(address);
+    const account = new Account(address, '0');
     const tx = new TransactionBuilder(account, {
       fee: BASE_FEE,
       networkPassphrase: NETWORK_PASSPHRASE,
@@ -132,9 +155,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, walletAddress, kit, connecting, connectWallet, signIn, signOut, refreshUser }}
+      value={{ user, walletAddress, kit, connecting, loading, connectWallet, signIn, signOut, refreshUser }}
     >
-      {children}
+      {loading ? <div>Loading…</div> : children}
     </AuthContext.Provider>
   );
 }

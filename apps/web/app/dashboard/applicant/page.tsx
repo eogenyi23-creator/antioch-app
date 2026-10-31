@@ -1,15 +1,17 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 import { useEffect, useState } from 'react';
 import { Nav } from '@/components/Nav';
 import { useAuth } from '@/components/AuthProvider';
 import { apiFetch } from '@/lib/api';
 import Link from 'next/link';
+import type { CampaignSummary } from '@antioch/shared';
+import { mapApiError } from '@/lib/errors';
 
 export default function ApplicantDashboard() {
   const { user } = useAuth();
-  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<(CampaignSummary & { createdBy?: string | null })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [campaignId, setCampaignId] = useState('');
   const [milestoneIndex, setMilestoneIndex] = useState('0');
   const [notes, setNotes] = useState('');
@@ -19,9 +21,13 @@ export default function ApplicantDashboard() {
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<any[]>('/campaigns').then((cs) => {
-      setCampaigns(cs.filter((c) => c.createdBy === user?.id));
-    }).finally(() => setLoading(false));
+    setLoading(true); setError(null);
+    apiFetch<(CampaignSummary & { createdBy?: string | null })[]>('/campaigns')
+      .then((cs) => {
+        setCampaigns(cs.filter((c) => c.createdBy === user?.id));
+      })
+      .catch((e) => setError(mapApiError(e)))
+      .finally(() => setLoading(false));
   }, [user]);
 
   async function submitEvidence(e: React.FormEvent) {
@@ -46,6 +52,7 @@ export default function ApplicantDashboard() {
       <h1 className="text-2xl font-bold">Applicant dashboard</h1>
       <h2 className="mt-4 text-lg font-semibold">My campaigns</h2>
       {loading && <p>Loading…</p>}
+      {error && <p className="text-red-600">{error}</p>}
       <ul className="mt-2 space-y-2">
         {campaigns.map((c) => (
           <li key={c.id} className="rounded border p-3">

@@ -1,32 +1,50 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 import { useEffect, useState } from 'react';
 import { Nav } from '@/components/Nav';
 import { useAuth } from '@/components/AuthProvider';
 import { apiFetch } from '@/lib/api';
 import { fromStroops } from '@antioch/shared';
+import type { DonationSummary, CampaignSummary } from '@antioch/shared';
 import { mapApiError } from '@/lib/errors';
+
+interface DonationRow extends DonationSummary {
+  campaignTitle?: string | null;
+  amountUsdc?: string;
+  confirmedAt?: string | null;
+}
+interface Receipt {
+  id: string;
+  campaignTitle?: string | null;
+  amountUsdc: string;
+  amountStroops: string;
+  txHash: string | null;
+  status: string;
+  donorAddress: string;
+  createdAt: string;
+  confirmedAt?: string | null;
+}
 
 export default function DonorDashboard() {
   const { user, kit, walletAddress } = useAuth();
-  const [donations, setDonations] = useState<any[]>([]);
-  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [donations, setDonations] = useState<DonationRow[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [receipt, setReceipt] = useState<any | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
 
   async function load() {
-    setLoading(true);
+    setLoading(true); setError(null);
     try {
-      const [ds, cs] = await Promise.all([apiFetch<any[]>('/me/donations'), apiFetch<any[]>('/campaigns')]);
+      const [ds, cs] = await Promise.all([apiFetch<DonationRow[]>('/me/donations'), apiFetch<CampaignSummary[]>('/campaigns')]);
       setDonations(ds);
       setCampaigns(cs);
-    } finally { setLoading(false); }
+    } catch (e) { setError(mapApiError(e)); } finally { setLoading(false); }
   }
   useEffect(() => { if (user) load(); }, [user]);
 
   async function viewReceipt(id: string) {
     try {
-      const r = await apiFetch<{ receipt: any }>(`/me/donations/${id}/receipt`);
+      const r = await apiFetch<{ receipt: Receipt }>(`/me/donations/${id}/receipt`);
       setReceipt(r.receipt);
     } catch (e) { alert(mapApiError(e)); }
   }
@@ -64,6 +82,7 @@ export default function DonorDashboard() {
         <button onClick={exportCsv} className="rounded border px-3 py-1 focus-ring">Export CSV</button>
       </div>
       {loading && <p className="mt-4">Loading…</p>}
+      {error && <p className="mt-4 text-red-600">{error}</p>}
       <table className="mt-4 w-full text-sm">
         <thead><tr className="text-left"><th>Campaign</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
