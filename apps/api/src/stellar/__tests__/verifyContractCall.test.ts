@@ -6,7 +6,6 @@ import {
   Operation,
   Address,
   nativeToScVal,
-  scValToNative,
 } from '@stellar/stellar-sdk';
 
 const NETWORK_PASSPHRASE = 'Test SDF Network ; September 2015';
