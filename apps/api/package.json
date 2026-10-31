@@ -13,6 +13,7 @@
     "db:migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {
+    "@antioch/escrow-client": "*",
     "@antioch/shared": "*",
     "@stellar/stellar-sdk": "^17.4.0",
     "cors": "^2.8.5",
@@ -57,8 +58,14 @@
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transform": {
-      "^.+\\.tsx?$": ["ts-jest", {}],
-      "^.+\\.jsx?$": ["babel-jest", {}]
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {}
+      ],
+      "^.+\\.jsx?$": [
+        "babel-jest",
+        {}
+      ]
     },
     "transformIgnorePatterns": [
       "/node_modules/(?!(uint8array-extras|@exodus/bytes|@noble/hashes|@noble/ed25519)/)"
