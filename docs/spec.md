@@ -1,5 +1,7 @@
 # Antioch App — Full Specification
 
+> **Status:** `apps/verifier`, fee sponsorship and PDF receipts are planned and not built yet. See the Roadmap in the README.
+
 > Living document. The Contract facts section wins for the contract interface. Last updated: 2026-10-27.
 
 ---
