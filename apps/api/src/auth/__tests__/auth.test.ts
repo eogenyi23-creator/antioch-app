@@ -11,6 +11,19 @@ process.env.DEPLOYER_SECRET = process.env.DEPLOYER_SECRET ?? 'SDUMMY';
 process.env.TOKEN_CONTRACT_ID = process.env.TOKEN_CONTRACT_ID ?? 'CC6MCT6QYA4O2CEDABD43IL5A3L3ODATL4FZLDGTPOMK3GS4RE5BH67D';
 process.env.USDC_ISSUER = process.env.USDC_ISSUER ?? 'GD3GCXWPPA6ZIGQGU6L4QPHVAJZKKJFPN7YFD4YZNKR23XFBNIO4DLR2';
 
+// Fake database: the auth test checks the nonce and signature logic, not Postgres.
+jest.mock('../../db/client.js', () => ({
+  db: {
+    select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }),
+    insert: () => ({
+      values: (v: { stellarAddress: string }) => ({
+        returning: async () => [{ id: 'test-user-id', stellarAddress: v.stellarAddress, role: 'donor' }],
+      }),
+    }),
+  },
+  pool: { end: async () => undefined },
+}));
+
 import app from '../../index.js';
 
 const NETWORK_PASSPHRASE = 'Test SDF Network ; September 2015';
