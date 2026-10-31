@@ -31,7 +31,7 @@ describe('donation flow', () => {
     submitSignedXdr.mockResolvedValue('txhash123');
 
     render(
-      <FundingWidget campaignId="c1" remainingCap={10000000n} status="active" kit={kit} walletAddress="GABC" />,
+      <FundingWidget campaignId="c1" remainingCap={10000000n} status="active" kit={kit} walletAddress="GABC" user={{ address: "GABC", role: "donor" }} />,
     );
     fireEvent.change(screen.getByLabelText('Donation amount'), { target: { value: '1.0000000' } });
     fireEvent.click(screen.getByText('Donate'));
@@ -44,7 +44,7 @@ describe('donation flow', () => {
     kit.signTransaction.mockRejectedValue(new Error('User declined'));
 
     render(
-      <FundingWidget campaignId="c1" remainingCap={10000000n} status="active" kit={kit} walletAddress="GABC" />,
+      <FundingWidget campaignId="c1" remainingCap={10000000n} status="active" kit={kit} walletAddress="GABC" user={{ address: "GABC", role: "donor" }} />,
     );
     fireEvent.change(screen.getByLabelText('Donation amount'), { target: { value: '1.0000000' } });
     fireEvent.click(screen.getByText('Donate'));
@@ -56,7 +56,7 @@ describe('donation flow', () => {
     apiFetch.mockRejectedValueOnce(new Error('Campaign not accepting donations'));
 
     render(
-      <FundingWidget campaignId="c1" remainingCap={10000000n} status="active" kit={kit} walletAddress="GABC" />,
+      <FundingWidget campaignId="c1" remainingCap={10000000n} status="active" kit={kit} walletAddress="GABC" user={{ address: "GABC", role: "donor" }} />,
     );
     fireEvent.change(screen.getByLabelText('Donation amount'), { target: { value: '1.0000000' } });
     fireEvent.click(screen.getByText('Donate'));
@@ -66,7 +66,7 @@ describe('donation flow', () => {
 
   test('over cap block', async () => {
     render(
-      <FundingWidget campaignId="c1" remainingCap={5000000n} status="active" kit={kit} walletAddress="GABC" />,
+      <FundingWidget campaignId="c1" remainingCap={5000000n} status="active" kit={kit} walletAddress="GABC" user={{ address: "GABC", role: "donor" }} />,
     );
     fireEvent.change(screen.getByLabelText('Donation amount'), { target: { value: '1.0000000' } });
     expect(screen.getByTestId('over-cap')).toBeInTheDocument();

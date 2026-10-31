@@ -1,30 +1,33 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 import { useEffect, useState } from 'react';
 import { Nav } from '@/components/Nav';
 import { useAuth } from '@/components/AuthProvider';
 import { apiFetch } from '@/lib/api';
 import { mapApiError } from '@/lib/errors';
+import type { CampaignSummary, MilestoneSummary } from '@antioch/shared';
 
 export default function ApproverDashboard() {
   const { user, kit, walletAddress } = useAuth();
-  const [items, setItems] = useState<any[]>([]);
+  interface EvidenceFile { url: string; name: string; mime: string; }
+  interface EvidenceEntry { id: string; notes: string; files?: EvidenceFile[]; }
+  interface QueueItem { campaign: CampaignSummary & { approvers: string[] }; milestone: MilestoneSummary & { index: number; title: string; description?: string | null; released: boolean }; evidence: EvidenceEntry[]; }
+  const [items, setItems] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true); setError(null);
     try {
-      const campaigns = await apiFetch<any[]>('/campaigns');
-      const mine = campaigns.filter((c) => Array.isArray(c.approvers) && c.approvers.includes(user?.address));
-      const out: any[] = [];
+      const campaigns = await apiFetch<(CampaignSummary & { approvers: string[] })[]>('/campaigns');
+      const mine = campaigns.filter((c) => Array.isArray(c.approvers) && c.approvers.includes(user?.address ?? ''));
+      const out: QueueItem[] = [];
       for (const c of mine) {
-        const ms = await apiFetch<any[]>(`/campaigns/${c.id}/milestones`);
+        const ms = await apiFetch<(MilestoneSummary & { index: number; title: string; description?: string | null; released: boolean })[]>(`/campaigns/${c.id}/milestones`);
         for (const m of ms) {
           if (m.released) continue;
-          let evidence: any[] = [];
-          try { evidence = await apiFetch<any[]>(`/campaigns/${c.id}/milestones/${m.index}/evidence`); } catch { /* ignore */ }
+          let evidence: EvidenceEntry[] = [];
+          try { evidence = await apiFetch<EvidenceEntry[]>(`/campaigns/${c.id}/milestones/${m.index}/evidence`); } catch { /* ignore */ }
           out.push({ campaign: c, milestone: m, evidence });
         }
       }
@@ -34,7 +37,7 @@ export default function ApproverDashboard() {
 
   useEffect(() => { if (user) load(); }, [user]);
 
-  async function approve(item: any) {
+  async function approve(item: QueueItem) {
     if (!kit || !walletAddress) return;
     const key = crypto.randomUUID();
     try {
@@ -63,10 +66,10 @@ export default function ApproverDashboard() {
             {it.evidence.length > 0 && (
               <div className="mt-2">
                 <p className="text-sm font-medium">Evidence:</p>
-                {it.evidence.map((ev: any) => (
+                {it.evidence.map((ev: EvidenceEntry) => (
                   <div key={ev.id} className="mt-1 text-sm">
                     <p>{ev.notes}</p>
-                    {ev.files?.map((f: any) => (
+                    {ev.files?.map((f: EvidenceFile) => (
                       <a key={f.url} href={f.url} target="_blank" className="text-blue-600 underline block">{f.name}</a>
                     ))}
                   </div>

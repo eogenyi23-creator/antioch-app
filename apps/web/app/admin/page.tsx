@@ -1,16 +1,24 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 import { useEffect, useState } from 'react';
 import { Nav } from '@/components/Nav';
 import { useAuth } from '@/components/AuthProvider';
 import { apiFetch } from '@/lib/api';
 import { mapApiError } from '@/lib/errors';
+import type { CampaignSummary, UserSummary } from '@antioch/shared';
+
+interface AuditEntry {
+  id: string;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  createdAt: string;
+}
 
 export default function AdminPage() {
   const { user } = useAuth();
-  const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [audit, setAudit] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignSummary[]>([]);
+  const [users, setUsers] = useState<UserSummary[]>([]);
+  const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,9 +26,9 @@ export default function AdminPage() {
     setLoading(true); setError(null);
     try {
       const [cs, us, al] = await Promise.all([
-        apiFetch<any[]>('/admin/campaigns'),
-        apiFetch<any[]>('/admin/users'),
-        apiFetch<any[]>('/admin/audit-log'),
+        apiFetch<CampaignSummary[]>('/admin/campaigns'),
+        apiFetch<UserSummary[]>('/admin/users'),
+        apiFetch<AuditEntry[]>('/admin/audit-log'),
       ]);
       setCampaigns(cs);
       setUsers(us);

@@ -7,6 +7,7 @@
  */
 
 import { Router } from 'express';
+import crypto from 'crypto';
 import { Keypair, Transaction } from '@stellar/stellar-sdk';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
@@ -31,7 +32,7 @@ const pendingChallenges = new Map<string, { nonce: string; expiresAt: number }>(
 router.post('/challenge', validate(AuthChallengeRequestSchema), (req, res, next) => {
   try {
     const { stellarAddress } = req.body as { stellarAddress: string };
-    const nonce = Keypair.random().publicKey(); // random 56-char string
+    const nonce = crypto.randomBytes(14).toString('hex'); // 28-char string (<= 28 bytes)
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
     pendingChallenges.set(stellarAddress, { nonce, expiresAt });
 
@@ -70,8 +71,13 @@ router.post('/verify', validate(AuthVerifyRequestSchema), async (req, res, next)
       throw new ApiError(400, 'Invalid transaction XDR');
     }
 
-    // Check memo matches nonce
-    if (tx.memo.value !== challenge.nonce) {
+    // Check memo matches nonce (memo value may be bytes after XDR decode)
+    const memoValue = tx.memo.value;
+    const memoText =
+      typeof memoValue === 'string'
+        ? memoValue
+        : Buffer.from(memoValue as Uint8Array).toString('utf8');
+    if (memoText !== challenge.nonce) {
       throw new ApiError(401, 'Nonce mismatch');
     }
 
