@@ -21,6 +21,7 @@ import {
 import {
   deployCampaignEscrow,
   hasTrustline,
+  dateToExpiryLedger,
 } from '../stellar/service.js';
 import {
   readState,
@@ -110,6 +111,7 @@ router.post(
           beneficiary: body.beneficiary,
           approvers: body.approvers,
           threshold: body.threshold,
+          expiryLedger: await dateToExpiryLedger(new Date(body.expiryDate)),
           createdBy: req.user!.id,
         })
         .returning();
