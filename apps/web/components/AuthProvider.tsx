@@ -82,25 +82,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  const connectWallet = useCallback(async () => {
+    const connectWallet = useCallback(async () => {
     if (!kit) return;
     setConnecting(true);
     try {
-      const { address } = await kit.getAddress();
-      setWalletAddress(address);
+      await kit.openModal({
+        onWalletSelected: async (option) => {
+          kit.setWallet(option.id);
+          const { address } = await kit.getAddress();
+          setWalletAddress(address);
+        },
+      });
+    } catch (e) {
+      console.error('Wallet connect failed', e);
     } finally {
       setConnecting(false);
     }
   }, [kit]);
 
-  const signIn = useCallback(async () => {
+    const signIn = useCallback(async () => {
     if (!kit) throw new Error('Wallet not ready');
-    if (!walletAddress) {
-      const { address } = await kit.getAddress();
-      setWalletAddress(address);
-    }
-    const address = walletAddress ?? (await kit.getAddress()).address;
-    setWalletAddress(address);
+    const address = walletAddress;
+    if (!address) throw new Error('Connect your wallet first');
 
     // challenge
     const challenge = await apiFetch<{ nonce: string }>(
