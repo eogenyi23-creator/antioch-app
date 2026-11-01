@@ -18,17 +18,24 @@ export function Nav() {
           {user?.role === 'applicant' && <Link href="/dashboard/applicant" className="hover:underline">Applicant</Link>}
           {user?.role === 'approver' && <Link href="/dashboard/approver" className="hover:underline">Approver</Link>}
           {user?.role === 'admin' && <Link href="/admin" className="hover:underline">Admin</Link>}
-          {!walletAddress ? (
+                    {user ? (
+            <>
+              {!walletAddress && (
+                <button onClick={connectWallet} className="rounded bg-blue-600 px-3 py-1 text-white focus-ring">
+                  Connect wallet
+                </button>
+              )}
+              <button onClick={signOut} className="rounded border px-3 py-1 focus-ring">
+                Sign out ({user.role})
+              </button>
+            </>
+          ) : !walletAddress ? (
             <button onClick={connectWallet} className="rounded bg-blue-600 px-3 py-1 text-white focus-ring">
               Connect wallet
             </button>
-          ) : !user ? (
+          ) : (
             <button onClick={signIn} className="rounded bg-blue-600 px-3 py-1 text-white focus-ring">
               Sign in
-            </button>
-          ) : (
-            <button onClick={signOut} className="rounded border px-3 py-1 focus-ring">
-              Sign out ({user.role})
             </button>
           )}
         </div>
