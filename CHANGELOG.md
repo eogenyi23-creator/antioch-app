@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Refunds after expiry
 - Public transparency page, receipts and CSV export
 - Web: `NEXT_PUBLIC_ASSET_CODE` setting (default `USDC`) for amount labels
+- Testnet setup script (npm run testnet:setup) and - README: step-by-step testnet run guide
 
 ### Fixed
 - Sign-in: the login nonce is now at most 28 bytes so it fits a Stellar text memo
