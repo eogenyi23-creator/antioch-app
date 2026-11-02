@@ -14,7 +14,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Public transparency page, receipts and CSV export
 - Web: `NEXT_PUBLIC_ASSET_CODE` setting (default `USDC`) for amount labels
 
- ### Fixed
+### Fixed
 - Sign-in: the login nonce is now at most 28 bytes so it fits a Stellar text memo
 - Sign-in: the wallet picker opens when connecting, and the session is restored after a reload
 - Campaigns: the expiry ledger is now saved when a campaign is created, so publishing no longer fails with "Campaign has no expiry date"
