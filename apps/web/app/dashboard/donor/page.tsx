@@ -4,6 +4,7 @@ import { Nav } from '@/components/Nav';
 import { useAuth } from '@/components/AuthProvider';
 import { apiFetch } from '@/lib/api';
 import { fromStroops } from '@antioch/shared';
+import { ASSET_CODE } from '@/lib/config';
 import type { DonationSummary, CampaignSummary } from '@antioch/shared';
 import { mapApiError } from '@/lib/errors';
 
@@ -92,7 +93,7 @@ export default function DonorDashboard() {
             return (
               <tr key={d.id} className="border-t">
                 <td className="py-2">{d.campaignTitle ?? d.campaignId}</td>
-                <td>{fromStroops(BigInt(d.amountStroops))} USDC</td>
+                <td>{fromStroops(BigInt(d.amountStroops))} {ASSET_CODE}</td>
                 <td>{d.status}</td>
                 <td className="space-x-2">
                   <button onClick={() => viewReceipt(d.id)} className="text-blue-600 underline">Receipt</button>

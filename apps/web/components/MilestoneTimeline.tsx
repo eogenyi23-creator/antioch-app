@@ -1,6 +1,7 @@
 'use client';
 
 import { fromStroops } from '@antioch/shared';
+import { ASSET_CODE } from '@/lib/config';
 
 export interface MilestoneItem {
   id: string;
@@ -41,7 +42,7 @@ export function MilestoneTimeline({
         return (
           <li key={m.id} className="rounded border p-4" data-testid={`milestone-${m.index}`}>
             <h3 className="font-semibold">{m.title}</h3>
-            <p className="text-sm">Amount: {fromStroops(BigInt(m.amountStroops))} USDC</p>
+            <p className="text-sm">Amount: {fromStroops(BigInt(m.amountStroops))} {ASSET_CODE}</p>
             <p className="text-sm">Status: {released ? 'Released' : thresholdMet ? 'Threshold met' : 'Pending'}</p>
             <p className="text-sm">Approvals: {approvals} / {threshold}</p>
             {canApprove && (

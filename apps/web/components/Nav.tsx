@@ -13,7 +13,7 @@ export function Nav() {
         </Link>
         <div className="flex items-center gap-3 text-sm">
           <Link href="/campaigns" className="hover:underline">Campaigns</Link>
-          {user?.role === 'applicant' && <Link href="/campaigns/new" className="hover:underline">New</Link>}
+          {(user?.role === 'applicant' || user?.role === 'admin') && <Link href="/campaigns/new" className="hover:underline">New</Link>}
           {user && <Link href="/dashboard/donor" className="hover:underline">Donor</Link>}
           {user?.role === 'applicant' && <Link href="/dashboard/applicant" className="hover:underline">Applicant</Link>}
           {user?.role === 'approver' && <Link href="/dashboard/approver" className="hover:underline">Approver</Link>}

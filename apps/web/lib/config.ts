@@ -11,3 +11,5 @@ export const NETWORK_PASSPHRASE =
   STELLAR_NETWORK === 'mainnet'
     ? 'Public Global Stellar Network ; September 2015'
     : 'Test SDF Network ; September 2015';
+
+export const ASSET_CODE = process.env.NEXT_PUBLIC_ASSET_CODE ?? 'USDC';

@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/api';
 import { formatUsdc, estimatedExpiryDate, explorerTxUrl, explorerContractUrl } from '@/lib/format';
 import { mapApiError } from '@/lib/errors';
 import { getLatestLedger } from '@antioch/escrow-client';
-import { RPC_URL } from '@/lib/config';
+import { RPC_URL, ASSET_CODE } from '@/lib/config';
 import { FundingWidget } from '@/components/FundingWidget';
 import { MilestoneTimeline, type MilestoneItem } from '@/components/MilestoneTimeline';
 
@@ -79,17 +79,12 @@ export default function CampaignDetailPage() {
       </div>
       {actionError && <p role="alert" className="mt-4 text-sm text-red-600" data-testid="action-error">{actionError}</p>}
       {tab === 'overview' && (<>
-        <section className="mt-6 rounded border p-4">
-          <h2 className="text-lg font-semibold">Funding</h2>
-          <div className="mt-2 h-3 w-full rounded bg-gray-200"><div className="h-3 rounded bg-blue-600" style={{ width: `${totalCap > 0n ? Math.min(100, Number((fundedTotal * 100n) / totalCap)) : 0}%` }} /></div>
-          <div className="mt-2 flex justify-between text-sm"><span>Funded: {formatUsdc(fundedTotal.toString())} USDC</span><span>Cap: {formatUsdc(totalCap.toString())} USDC</span></div>
-        </section>
-        <FundingWidget campaignId={id} remainingCap={remainingCap} status={campaign.status} kit={kit} walletAddress={walletAddress} user={user} connectWallet={connectWallet} signIn={signIn} onDonated={load} />
+        <FundingWidget campaignId={id} fundedTotal={fundedTotal} totalCap={totalCap} remainingCap={remainingCap} status={campaign.status} kit={kit} walletAddress={walletAddress} user={user} connectWallet={connectWallet} signIn={signIn} onDonated={load} />
         <section className="mt-6">
           <h2 className="text-lg font-semibold">Milestones</h2>
           <MilestoneTimeline milestones={milestones as unknown as MilestoneItem[]} campaign={campaign} user={user} approvedByMe={approvedByMe} onApprove={handleApprove} onRelease={handleRelease} />
         </section>
       </>)}
-      {tab === 'transparency' && (<section className="mt-6">{!transparency && <p>Loading…</p>}{transparency && (<div className="space-y-4"><h2 className="text-lg font-semibold">Funds in (donations)</h2><ul className="space-y-1 text-sm">{transparency.donations.map((d) => (<li key={d.id}>{formatUsdc(d.amountStroops)} USDC — {d.status}{d.txHash && (<> <a href={explorerTxUrl(d.txHash)} target="_blank" className="text-blue-600 underline">tx</a></>)}</li>))}{transparency.donations.length === 0 && <li className="text-gray-500">No donations yet.</li>}</ul><h2 className="text-lg font-semibold">Approvals</h2><ul className="space-y-1 text-sm">{transparency.approvals.map((a) => (<li key={a.id}>Milestone {a.milestoneIndex}{a.txHash && (<> <a href={explorerTxUrl(a.txHash)} target="_blank" className="text-blue-600 underline">tx</a></>)}</li>))}{transparency.approvals.length === 0 && <li className="text-gray-500">No approvals yet.</li>}</ul><h2 className="text-lg font-semibold">Releases</h2><ul className="space-y-1 text-sm">{transparency.releases && transparency.releases.length > 0 ? transparency.releases.map((r, i) => (<li key={r.txHash ?? i}>Milestone {r.milestoneIndex}{r.txHash && (<> <a href={explorerTxUrl(r.txHash)} target="_blank" className="text-blue-600 underline">tx</a></>)}</li>)) : transparency.milestones.filter((m) => m.released).map((m) => (<li key={m.id}>Milestone {m.index}: {formatUsdc(m.amountStroops)} USDC released</li>))}{transparency.milestones.filter((m) => m.released).length === 0 && !(transparency.releases && transparency.releases.length) && <li className="text-gray-500">No releases yet.</li>}</ul></div>)}</section>)}</main></div>
+      {tab === 'transparency' && (<section className="mt-6">{!transparency && <p>Loading…</p>}{transparency && (<div className="space-y-4"><h2 className="text-lg font-semibold">Funds in (donations)</h2><ul className="space-y-1 text-sm">{transparency.donations.map((d) => (<li key={d.id}>{formatUsdc(d.amountStroops)} {ASSET_CODE} — {d.status}{d.txHash && (<> <a href={explorerTxUrl(d.txHash)} target="_blank" className="text-blue-600 underline">tx</a></>)}</li>))}{transparency.donations.length === 0 && <li className="text-gray-500">No donations yet.</li>}</ul><h2 className="text-lg font-semibold">Approvals</h2><ul className="space-y-1 text-sm">{transparency.approvals.map((a) => (<li key={a.id}>Milestone {a.milestoneIndex}{a.txHash && (<> <a href={explorerTxUrl(a.txHash)} target="_blank" className="text-blue-600 underline">tx</a></>)}</li>))}{transparency.approvals.length === 0 && <li className="text-gray-500">No approvals yet.</li>}</ul><h2 className="text-lg font-semibold">Releases</h2><ul className="space-y-1 text-sm">{transparency.releases && transparency.releases.length > 0 ? transparency.releases.map((r, i) => (<li key={r.txHash ?? i}>Milestone {r.milestoneIndex}{r.txHash && (<> <a href={explorerTxUrl(r.txHash)} target="_blank" className="text-blue-600 underline">tx</a></>)}</li>)) : transparency.milestones.filter((m) => m.released).map((m) => (<li key={m.id}>Milestone {m.index}: {formatUsdc(m.amountStroops)} {ASSET_CODE} released</li>))}{transparency.milestones.filter((m) => m.released).length === 0 && !(transparency.releases && transparency.releases.length) && <li className="text-gray-500">No releases yet.</li>}</ul></div>)}</section>)}</main></div>
   );
 }

@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Nav } from '@/components/Nav';
 import Link from 'next/link';
+import { formatUsdc } from '@/lib/format';
+import { ASSET_CODE } from '@/lib/config';
 import { apiFetch } from '@/lib/api';
 
 interface Campaign {
@@ -73,7 +75,7 @@ export default function CampaignsPage() {
               <h2 className="font-semibold">{c.title}</h2>
               <p className="mt-1 text-sm text-gray-600 line-clamp-2">{c.story}</p>
               <p className="mt-2 text-xs text-gray-500">
-                Status: {c.status} · Goal: {c.goalStroops} stroops
+                Status: {c.status} · Goal: {formatUsdc(c.goalStroops)} {ASSET_CODE}
               </p>
             </Link>
           ))}

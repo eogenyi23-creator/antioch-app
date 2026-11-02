@@ -90,6 +90,45 @@ npm run dev              # starts web and api
 
 The web app runs at `http://localhost:3000` and the API at `http://localhost:5000`. API docs are at `/docs`.
 
+### Run it on testnet
+
+Prerequisites:
+
+- Node.js 20+ and npm or pnpm
+- Docker (for the database)
+- A funded Stellar testnet key for `DEPLOYER_SECRET` — it only pays for deploying campaign contracts, it never holds user funds
+
+```bash
+git clone https://github.com/eogenyi23-creator/antioch-app.git
+cd antioch-app
+npm install
+cp .env.example .env     # then fill in JWT_SECRET, JWT_REFRESH_SECRET and DEPLOYER_SECRET
+docker compose up -d     # database
+npm run db:migrate --workspace=apps/api
+npm run testnet:setup    # creates a TESTUSD token, a donor and a beneficiary account, and updates .env;
+                         # secrets are saved outside the repo in ~/antioch-testnet-keys.json
+npm run dev              # starts web and api
+```
+
+Important setup notes:
+
+- The API reads `.env` from `apps/api`, so link or copy the root `.env` there (and to `apps/web/.env.local`).
+- In GitHub Codespaces, make port 5000 public and set `NEXT_PUBLIC_API_URL` and `CORS_ORIGIN` to the forwarded addresses with no trailing slash.
+- Restart after changing `.env`.
+- Leave `VERIFIER_URL` empty.
+
+Walkthrough:
+
+1. Sign in with a wallet (Albedo works in any browser). Import the donor secret from the setup script into your wallet.
+2. Promote your user to admin with the one-line psql command:
+   ```bash
+   psql "$DATABASE_URL" -c "UPDATE users SET role = 'admin' WHERE stellar_address = '<YOUR_STELLAR_ADDRESS>';"
+   ```
+3. Create a campaign at `/campaigns/new`.
+4. Publish it from `/admin`.
+5. Donate, then approve and release a milestone.
+6. Check the Transparency tab.
+
 ### Environment variables
 
 | Variable | Required | Description |
@@ -106,6 +145,7 @@ The web app runs at `http://localhost:3000` and the API at `http://localhost:500
 | `ESCROW_CONTRACT_ID` | No | Showcase / demo contract for read-only dev; real campaigns store their own |
 | `USDC_ISSUER` | **Yes** | USDC issuer for the chosen network |
 | `USDC_ASSET_CODE` | No (default `USDC`) | Token asset code |
+| `NEXT_PUBLIC_ASSET_CODE` | No (default `USDC`) | Asset code shown in amount labels |
 
 See `.env.example` for the full list.
 
