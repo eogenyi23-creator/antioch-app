@@ -93,7 +93,7 @@ export function FundingWidget({
             </button>
           ) : (
             <>
-              <label className="block text-sm font-medium" htmlFor="amount">Amount (USDC)</label>
+              <label className="block text-sm font-medium" htmlFor="amount">Amount ({ASSET_CODE})</label>
               <input id="amount" type="text" value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 w-full rounded border px-3 py-2 focus-ring" aria-label="Donation amount" />
               {overCap && <p className="mt-1 text-sm text-red-600" data-testid="over-cap">Amount exceeds remaining fundable cap.</p>}
               <button onClick={handleDonate} disabled={donateState === 'signing' || donateState === 'submitting' || donateState === 'confirming' || overCap} className="mt-3 rounded bg-blue-600 px-4 py-2 text-white focus-ring disabled:opacity-50">
