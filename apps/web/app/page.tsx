@@ -1,5 +1,6 @@
 import { Nav } from '@/components/Nav';
 import Link from 'next/link';
+import { ASSET_CODE } from '@/lib/config';
 
 const SHOWCASE = 'CDVECNXDBALTJUXWXLHINICDG3V4FNSYZ24IJSKKLESHX323VRII2BHP';
 
@@ -33,7 +34,7 @@ export default function Home() {
           <ol className="mt-4 grid gap-4 md:grid-cols-3">
             <li className="rounded border p-4">
               <strong>1. Fund</strong>
-              <p className="mt-2 text-sm text-gray-600">Donors give USDC to a campaign. Funds are locked in escrow.</p>
+              <p className="mt-2 text-sm text-gray-600">Donors give {ASSET_CODE} to a campaign. Funds are locked in escrow.</p>
             </li>
             <li className="rounded border p-4">
               <strong>2. Approve</strong>

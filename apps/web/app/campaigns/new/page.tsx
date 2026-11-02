@@ -1,9 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Nav } from '@/components/Nav';
 import { useAuth } from '@/components/AuthProvider';
 import { apiFetch } from '@/lib/api';
 import { CreateCampaignRequestSchema, toStroops } from '@antioch/shared';
+import { ASSET_CODE } from '@/lib/config';
 import { useRouter } from 'next/navigation';
 interface MilestoneInput { title: string; description: string; amount: string; }
 export default function NewCampaignPage() {
@@ -19,6 +20,7 @@ export default function NewCampaignPage() {
   const [milestones, setMilestones] = useState<MilestoneInput[]>([{ title: '', description: '', amount: '' }]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submitGuard = useRef(false);
   function addMilestone() { setMilestones([...milestones, { title: '', description: '', amount: '' }]); }
   function updateMilestone(i: number, field: keyof MilestoneInput, value: string) { const next = [...milestones]; next[i] = { ...next[i], [field]: value }; setMilestones(next); }
   function removeMilestone(i: number) { setMilestones(milestones.filter((_, idx) => idx !== i)); }
@@ -29,8 +31,10 @@ export default function NewCampaignPage() {
     const parsed = CreateCampaignRequestSchema.safeParse(body);
     if (!parsed.success) { setError(parsed.error.issues.map((i) => i.message).join('; ')); return; }
     try { const goalStroops = toStroops(goal); const sum = milestones.reduce((s, m) => s + toStroops(m.amount || '0'), 0n); if (sum !== goalStroops) { setError('Milestones must add up to the goal'); return; } } catch { setError('Invalid amounts'); return; }
+    if (submitGuard.current) return;
+    submitGuard.current = true;
     setSubmitting(true);
-    try { const res = await apiFetch<{ id: string }>('/campaigns', { method: 'POST', body: JSON.stringify(parsed.data) }); router.push(`/campaigns/${res.id}`); } catch (err) { setError((err as Error).message); } finally { setSubmitting(false); }
+    try { const res = await apiFetch<{ id: string }>('/campaigns', { method: 'POST', body: JSON.stringify(parsed.data) }); router.push(`/campaigns/${res.id}`); } catch (err) { setError((err as Error).message); } finally { setSubmitting(false); submitGuard.current = false; }
   }
   if (!user) return <div><Nav /><main className="p-8">Please sign in as applicant.</main></div>;
   return (
@@ -39,7 +43,7 @@ export default function NewCampaignPage() {
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div><label className="block text-sm font-medium" htmlFor="title">Title</label><input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 w-full rounded border px-3 py-2 focus-ring" /></div>
         <div><label className="block text-sm font-medium" htmlFor="story">Story</label><textarea id="story" value={story} onChange={(e) => setStory(e.target.value)} className="mt-1 w-full rounded border px-3 py-2 focus-ring" rows={4} /></div>
-        <div><label className="block text-sm font-medium" htmlFor="goal">Goal (USDC)</label><input id="goal" value={goal} onChange={(e) => setGoal(e.target.value)} className="mt-1 w-full rounded border px-3 py-2 focus-ring" /></div>
+        <div><label className="block text-sm font-medium" htmlFor="goal">Goal ({ASSET_CODE})</label><input id="goal" value={goal} onChange={(e) => setGoal(e.target.value)} className="mt-1 w-full rounded border px-3 py-2 focus-ring" /></div>
         <div><label className="block text-sm font-medium" htmlFor="beneficiary">Beneficiary (Stellar address)</label><input id="beneficiary" value={beneficiary} onChange={(e) => setBeneficiary(e.target.value)} className="mt-1 w-full rounded border px-3 py-2 focus-ring" /></div>
         <div><label className="block text-sm font-medium" htmlFor="approvers">Approvers (comma-separated Stellar addresses)</label><input id="approvers" value={approvers} onChange={(e) => setApprovers(e.target.value)} className="mt-1 w-full rounded border px-3 py-2 focus-ring" /></div>
         <div><label className="block text-sm font-medium" htmlFor="threshold">Threshold</label><input id="threshold" type="number" value={threshold} onChange={(e) => setThreshold(e.target.value)} className="mt-1 w-full rounded border px-3 py-2 focus-ring" /></div>
@@ -50,7 +54,7 @@ export default function NewCampaignPage() {
             <div key={i} className="mt-2 rounded border p-3 space-y-2">
               <input placeholder="Title" value={m.title} onChange={(e) => updateMilestone(i, 'title', e.target.value)} className="w-full rounded border px-3 py-2 focus-ring" />
               <input placeholder="Description" value={m.description} onChange={(e) => updateMilestone(i, 'description', e.target.value)} className="w-full rounded border px-3 py-2 focus-ring" />
-              <input placeholder="Amount (USDC)" value={m.amount} onChange={(e) => updateMilestone(i, 'amount', e.target.value)} className="w-full rounded border px-3 py-2 focus-ring" />
+              <input placeholder={`Amount (${ASSET_CODE})`} value={m.amount} onChange={(e) => updateMilestone(i, 'amount', e.target.value)} className="w-full rounded border px-3 py-2 focus-ring" />
               {milestones.length > 1 && <button type="button" onClick={() => removeMilestone(i)} className="text-sm text-red-600">Remove</button>}
             </div>
           ))}

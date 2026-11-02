@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { toStroops } from '@antioch/shared';
 import { formatUsdc } from '@/lib/format';
+import { ASSET_CODE } from '@/lib/config';
 import { mapApiError } from '@/lib/errors';
 import type { StellarWalletsKit } from '@creit.tech/stellar-wallets-kit';
 
@@ -11,6 +12,8 @@ type DonateState = 'idle' | 'signing' | 'submitting' | 'confirming' | 'success' 
 
 export function FundingWidget({
   campaignId,
+  fundedTotal,
+  totalCap,
   remainingCap,
   status,
   kit,
@@ -21,6 +24,8 @@ export function FundingWidget({
   onDonated,
 }: {
   campaignId: string;
+  fundedTotal: bigint;
+  totalCap: bigint;
   remainingCap: bigint;
   status: string;
   kit: StellarWalletsKit | null;
@@ -73,7 +78,9 @@ export function FundingWidget({
   return (
     <section className="mt-6 rounded border p-4" data-testid="funding-widget">
       <h2 className="text-lg font-semibold">Funding</h2>
-      <p className="mt-1 text-sm text-gray-600">Remaining fundable: {formatUsdc(remainingCap.toString())} USDC</p>
+      <div className="mt-2 h-3 w-full rounded bg-gray-200"><div className="h-3 rounded bg-blue-600" style={{ width: `${totalCap > 0n ? Math.min(100, Number((fundedTotal * 100n) / totalCap)) : 0}%` }} /></div>
+      <div className="mt-2 flex justify-between text-sm"><span>Funded: {formatUsdc(fundedTotal.toString())} {ASSET_CODE}</span><span>Cap: {formatUsdc(totalCap.toString())} {ASSET_CODE}</span></div>
+      <p className="mt-1 text-sm text-gray-600">Remaining fundable: {formatUsdc(remainingCap.toString())} {ASSET_CODE}</p>
       {status === 'active' && (
         <div className="mt-4">
           {!walletAddress ? (
