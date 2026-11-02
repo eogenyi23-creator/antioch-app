@@ -24,6 +24,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Web: amount labels and placeholders use NEXT_PUBLIC_ASSET_CODE instead of hardcoded USDC
 - Web: the nav "New" link is now shown to admins as well as applicants
 - Web: create-campaign submit is guarded against double submits
+- Web: the create-campaign form ignores a second click while a submit is in progress
 
    ### Known gaps
    - The evidence verifier service and fee sponsorship are planned and not built yet
